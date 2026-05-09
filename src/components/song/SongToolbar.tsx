@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import Animated, { AnimatedStyleProp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, spacing } from '@/src/theme/colors';
@@ -15,6 +16,7 @@ interface Props {
   currentKey: string;
   isOriginalKey: boolean;
   autoScrollOpen: boolean;
+  toolbarStyle?: AnimatedStyleProp<ViewStyle>;
   onPressKey: () => void;
   onPressListen: () => void;
   onPressAutoScroll: () => void;
@@ -25,6 +27,7 @@ export function SongToolbar({
   currentKey,
   isOriginalKey,
   autoScrollOpen,
+  toolbarStyle,
   onPressKey,
   onPressListen,
   onPressAutoScroll,
@@ -33,8 +36,8 @@ export function SongToolbar({
   const insets = useSafeAreaInsets();
 
   return (
-    <View
-      style={[styles.wrap, { bottom: insets.bottom + TOOLBAR_BOTTOM_MARGIN }]}
+    <Animated.View
+      style={[styles.wrap, { bottom: insets.bottom + TOOLBAR_BOTTOM_MARGIN }, toolbarStyle]}
       pointerEvents="box-none"
     >
       <View style={styles.pill}>
@@ -57,7 +60,7 @@ export function SongToolbar({
         <View style={styles.divider} />
         <ToolbarItem icon="text-outline" label="Texto" onPress={onPressFont} />
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
