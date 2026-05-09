@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChordLine } from '@/src/components/ChordLine';
@@ -14,7 +15,7 @@ import { ChordDictionary, Instrument } from '@/src/components/song/ChordDictiona
 import { FontSheet, FontSheetHandle } from '@/src/components/song/FontSheet';
 import { KeySheet, KeySheetHandle } from '@/src/components/song/KeySheet';
 import { ListenSheet, ListenSheetHandle } from '@/src/components/song/ListenSheet';
-import { SongToolbar, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
+import { SongToolbar, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
 import { getSongById } from '@/src/data/songs';
 import { useFavorites } from '@/src/hooks/useFavorites';
 import { useFontSize } from '@/src/hooks/useFontSize';
@@ -78,8 +79,15 @@ export default function SongScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const offset = useRef(0);
+  const lastScrollY = useRef(0);
   const rafRef = useRef<number | null>(null);
   const speedRef = useRef(scrollSpeed);
+
+  // Pill hide/show animation
+  const pillTranslateY = useSharedValue(0);
+  const pillAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: pillTranslateY.value }],
+  }));
   speedRef.current = scrollSpeed;
 
   useEffect(() => {
@@ -129,8 +137,19 @@ export default function SongScreen() {
   );
 
   const onScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
-    offset.current = e.nativeEvent.contentOffset.y;
-  }, []);
+    const y = e.nativeEvent.contentOffset.y;
+    const dy = y - lastScrollY.current;
+    lastScrollY.current = y;
+    offset.current = y;
+
+    if (y < 10) {
+      pillTranslateY.value = withTiming(0, { duration: 200 });
+    } else if (dy > 8) {
+      pillTranslateY.value = withTiming(TOOLBAR_PILL_HEIGHT + 80, { duration: 200 });
+    } else if (dy < -8) {
+      pillTranslateY.value = withTiming(0, { duration: 200 });
+    }
+  }, [pillTranslateY]);
 
   const onChangeFont = useCallback((delta: number) => {
     changeFont(delta);
@@ -228,6 +247,7 @@ export default function SongScreen() {
         currentKey={currentKey}
         isOriginalKey={isOriginalKey}
         autoScrollOpen={autoScrollOpen}
+        toolbarStyle={pillAnimatedStyle}
         onPressKey={onPressKey}
         onPressListen={onPressListen}
         onPressAutoScroll={onPressAutoScroll}
