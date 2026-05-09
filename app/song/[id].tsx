@@ -15,7 +15,7 @@ import { ChordDictionary, Instrument } from '@/src/components/song/ChordDictiona
 import { FontSheet, FontSheetHandle } from '@/src/components/song/FontSheet';
 import { KeySheet, KeySheetHandle } from '@/src/components/song/KeySheet';
 import { ListenSheet, ListenSheetHandle } from '@/src/components/song/ListenSheet';
-import { SongToolbar, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
+import { SongToolbar, TOOLBAR_BOTTOM_MARGIN, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
 import { getSongById } from '@/src/data/songs';
 import { useFavorites } from '@/src/hooks/useFavorites';
 import { useFontSize } from '@/src/hooks/useFontSize';
