@@ -30,9 +30,9 @@ import {
   transposeChord,
 } from '@/src/utils/chord-transposer';
 
-// Auto-scroll: speed range tuned so 0 ≈ 0.3 px/frame, 1 ≈ 4 px/frame.
-const MIN_PX_PER_FRAME = 0.3;
-const MAX_PX_PER_FRAME = 4;
+// Auto-scroll: speed range tuned so 0 ≈ 0.05 px/frame, 1 ≈ 0.8 px/frame.
+const MIN_PX_PER_FRAME = 0.05;
+const MAX_PX_PER_FRAME = 0.8;
 
 export default function SongScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
