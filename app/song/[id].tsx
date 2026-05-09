@@ -160,10 +160,13 @@ export default function SongScreen() {
   const onPressFont = useCallback(() => fontSheetRef.current?.present(), []);
   const onPressAutoScroll = useCallback(() => {
     setAutoScrollOpen((v) => {
-      if (v) setAutoScrollPlaying(false);
-      return !v;
+      const next = !v;
+      pillTranslateY.value = withTiming(next ? TOOLBAR_PILL_HEIGHT + 80 : 0, { duration: 250 });
+      if (next) setAutoScrollPlaying(true);
+      else setAutoScrollPlaying(false);
+      return next;
     });
-  }, []);
+  }, [pillTranslateY]);
   const onTogglePlay = useCallback(() => setAutoScrollPlaying((v) => !v), []);
   const onCloseAutoScroll = useCallback(() => {
     setAutoScrollPlaying(false);
