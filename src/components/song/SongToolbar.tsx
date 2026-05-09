@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '@/src/theme/colors';
 
 export const TOOLBAR_PILL_HEIGHT = 48;
-const TOOLBAR_BOTTOM_MARGIN = 16;
+export const TOOLBAR_BOTTOM_MARGIN = 16;
 
 export function toolbarBottomOffset(insetsBottom: number) {
   return insetsBottom + TOOLBAR_BOTTOM_MARGIN + TOOLBAR_PILL_HEIGHT + spacing.sm;
