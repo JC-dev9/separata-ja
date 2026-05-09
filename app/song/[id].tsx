@@ -240,7 +240,7 @@ export default function SongScreen() {
         visible={autoScrollOpen}
         playing={autoScrollPlaying}
         speed={scrollSpeed}
-        bottomOffset={toolbarBottomOffset(insets.bottom)}
+        bottomOffset={insets.bottom + TOOLBAR_BOTTOM_MARGIN}
         onTogglePlay={onTogglePlay}
         onSpeedChange={setScrollSpeed}
         onClose={onCloseAutoScroll}
