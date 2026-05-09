@@ -1,6 +1,12 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { colors, radius, spacing } from '@/src/theme/colors';
 
@@ -23,10 +29,28 @@ export function AutoScrollBar({
   onSpeedChange,
   onClose,
 }: Props) {
+  const translateY = useSharedValue(120);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = 120;
+      translateY.value = withTiming(0, { duration: 250 });
+    } else {
+      translateY.value = 120;
+    }
+  }, [visible, translateY]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
   if (!visible) return null;
 
   return (
-    <View style={[styles.wrap, { bottom: bottomOffset }]} pointerEvents="box-none">
+    <Animated.View
+      style={[styles.wrap, { bottom: bottomOffset }, animatedStyle]}
+      pointerEvents="box-none"
+    >
       <View style={styles.bar}>
         <Pressable
           onPress={onTogglePlay}
@@ -71,7 +95,7 @@ export function AutoScrollBar({
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </Pressable>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
