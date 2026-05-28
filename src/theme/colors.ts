@@ -11,6 +11,7 @@ export const colors = {
   textDim: '#6B7280',
   chord: '#F59E0B',
   danger: '#EF4444',
+  inTune: '#22C55E',
 };
 
 export const spacing = {
