@@ -67,3 +67,61 @@ export function isInstrumentalLine(line: string): boolean {
   const stripped = line.replace(/\[(.*?)\]/g, '').trim();
   return stripped.length === 0 && /\[.*?\]/.test(line);
 }
+
+export function serializeLine(segments: Segment[]): string {
+  return segments
+    .map((s) => (s.chord ? `[${s.chord}]` : '') + s.text)
+    .join('');
+}
+
+// Insere um acorde dentro do texto de um segmento, dividindo-o em duas partes.
+// - Se o segmento não tem acorde: parte simples; esquerda chordless, direita
+//   recebe o novo acorde.
+// - Se o segmento já tem acorde: a esquerda mantém o acorde original e o
+//   texto até ao offset; a direita recebe o novo acorde com o resto do texto.
+//   Inserir em offset 0 dum segmento com acorde é ignorado (duplicaria
+//   acordes no mesmo sítio).
+export function insertChordAt(
+  segments: Segment[],
+  segIdx: number,
+  charOffset: number,
+  chord: string,
+): Segment[] {
+  if (!chord) return segments;
+  if (segIdx < 0 || segIdx >= segments.length) return segments;
+  const target = segments[segIdx];
+  const offset = Math.max(0, Math.min(charOffset, target.text.length));
+
+  if (target.chord) {
+    if (offset === 0) return segments;
+    const left = target.text.slice(0, offset);
+    const right = target.text.slice(offset);
+    const next = [...segments];
+    next.splice(segIdx, 1, { chord: target.chord, text: left }, { chord, text: right });
+    return next;
+  }
+
+  const left = target.text.slice(0, offset);
+  const right = target.text.slice(offset);
+  const next = [...segments];
+  next.splice(segIdx, 1, { chord: '', text: left }, { chord, text: right });
+  return next;
+}
+
+// Remove o acorde no índice dado, mantendo o texto da sílaba.
+// O texto funde-se com o segmento anterior (ou fica solto se for o primeiro).
+export function deleteChordAt(segments: Segment[], index: number): Segment[] {
+  if (index < 0 || index >= segments.length) return segments;
+  const target = segments[index];
+  if (!target.chord) return segments;
+
+  const next = [...segments];
+  if (index > 0) {
+    const prev = next[index - 1];
+    next[index - 1] = { chord: prev.chord, text: prev.text + target.text };
+    next.splice(index, 1);
+  } else {
+    next[index] = { chord: '', text: target.text };
+  }
+  return next;
+}
