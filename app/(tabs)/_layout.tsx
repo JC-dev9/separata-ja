@@ -48,6 +48,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="tuner"
+        options={{
+          title: 'Afinador',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="musical-note" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
