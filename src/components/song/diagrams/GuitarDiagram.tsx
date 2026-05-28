@@ -57,7 +57,7 @@ export function GuitarDiagram({ chord, shape, size = 'md' }: Props) {
               <Stop offset="1" stopColor="#9A9A9F" />
             </LinearGradient>
             <LinearGradient id="dot" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#FFD27A" />
+              <Stop offset="0" stopColor="#4FD8E4" />
               <Stop offset="1" stopColor={colors.primary} />
             </LinearGradient>
           </Defs>
@@ -162,7 +162,7 @@ export function GuitarDiagram({ chord, shape, size = 'md' }: Props) {
               height={c.dot * 2}
               rx={c.dot}
               fill="url(#dot)"
-              stroke="#7A4A04"
+              stroke="#0A6E78"
               strokeWidth={0.8}
             />
           ) : null}
@@ -185,7 +185,7 @@ export function GuitarDiagram({ chord, shape, size = 'md' }: Props) {
                 cy={cy}
                 r={c.dot}
                 fill="url(#dot)"
-                stroke="#7A4A04"
+                stroke="#0A6E78"
                 strokeWidth={0.8}
               />
             );

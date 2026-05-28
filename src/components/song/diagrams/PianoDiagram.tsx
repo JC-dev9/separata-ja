@@ -72,12 +72,12 @@ export function PianoDiagram({ chord, shape, size = 'md' }: Props) {
                 <Stop offset="1" stopColor="#D8D8DC" />
               </LinearGradient>
               <LinearGradient id="whiteActive" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#FFD27A" />
+                <Stop offset="0" stopColor="#4FD8E4" />
                 <Stop offset="1" stopColor={colors.primary} />
               </LinearGradient>
               <LinearGradient id="whiteRoot" x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor={colors.primary} />
-                <Stop offset="1" stopColor="#B97309" />
+                <Stop offset="1" stopColor={colors.primaryDim} />
               </LinearGradient>
               <LinearGradient id="black" x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor="#3A3A40" />
@@ -85,11 +85,11 @@ export function PianoDiagram({ chord, shape, size = 'md' }: Props) {
                 <Stop offset="1" stopColor="#08080A" />
               </LinearGradient>
               <LinearGradient id="blackActive" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#FFB94B" />
-                <Stop offset="1" stopColor="#B97309" />
+                <Stop offset="0" stopColor="#2FC8D6" />
+                <Stop offset="1" stopColor={colors.primaryDim} />
               </LinearGradient>
               <LinearGradient id="blackRoot" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#FFD27A" />
+                <Stop offset="0" stopColor="#4FD8E4" />
                 <Stop offset="1" stopColor={colors.primary} />
               </LinearGradient>
             </Defs>
