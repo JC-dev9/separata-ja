@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChordLine } from '@/src/components/ChordLine';
+import { deleteChordAt, insertChordAt, parseLine, serializeLine } from '@/src/utils/chord-parser';
+import { useSongOverride } from '@/src/hooks/useSongOverride';
+import { ChordPickerSheet, ChordPickerSheetHandle } from '@/src/components/song/ChordPickerSheet';
 import { AutoScrollBar } from '@/src/components/song/AutoScrollBar';
 import {
   ChordDetailSheet,
@@ -16,6 +19,7 @@ import { FontSheet, FontSheetHandle } from '@/src/components/song/FontSheet';
 import { KeySheet, KeySheetHandle } from '@/src/components/song/KeySheet';
 import { ListenSheet, ListenSheetHandle } from '@/src/components/song/ListenSheet';
 import { SongToolbar, TOOLBAR_BOTTOM_MARGIN, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
+import { UndoSnackbar } from '@/src/components/song/UndoSnackbar';
 import { getSongById } from '@/src/data/songs';
 import { useFavorites } from '@/src/hooks/useFavorites';
 import { useFontSize } from '@/src/hooks/useFontSize';
@@ -42,16 +46,20 @@ export default function SongScreen() {
 
   const { fontSize, changeFont } = useFontSize();
   const [instrument, setInstrument] = useState<Instrument>('guitar');
+  const [editing, setEditing] = useState(false);
 
-  // Pre-split content + base chord set. These only depend on the song.
-  const lines = useMemo(() => (song ? song.content.split('\n') : []), [song]);
+  const { override, setOverride, clearOverride, hasOverride } = useSongOverride(song?.id);
+  const effectiveContent = override ?? song?.content ?? '';
+
+  // Pre-split content + base chord set.
+  const lines = useMemo(() => effectiveContent.split('\n'), [effectiveContent]);
   const baseChords = useMemo(
-    () => (song ? extractUniqueChords(song.content) : []),
-    [song],
+    () => (effectiveContent ? extractUniqueChords(effectiveContent) : []),
+    [effectiveContent],
   );
   const originalKey = useMemo(
-    () => (song ? detectOriginalKey(song.content) : 'C'),
-    [song],
+    () => (effectiveContent ? detectOriginalKey(effectiveContent) : 'C'),
+    [effectiveContent],
   );
 
   const [currentKey, setCurrentKey] = useState(originalKey);
@@ -174,6 +182,161 @@ export default function SongScreen() {
   }, []);
   const onRestoreKey = useCallback(() => setCurrentKey(originalKey), [originalKey]);
 
+  const [undoSnapshot, setUndoSnapshot] = useState<string | null>(null);
+  const [movingChord, setMovingChord] = useState<{ lineIdx: number; segIdx: number; chord: string } | null>(null);
+  const [selectingMove, setSelectingMove] = useState(false);
+  const chordPickerRef = useRef<ChordPickerSheetHandle>(null);
+  const pendingInsert = useRef<{ lineIdx: number; segIdx: number; charOffset: number } | null>(null);
+
+  const onDeleteChord = useCallback(
+    (lineIdx: number, segIdx: number) => {
+      const linesNow = effectiveContent.split('\n');
+      const target = linesNow[lineIdx];
+      if (target == null) return;
+      const segs = parseLine(target);
+      const next = deleteChordAt(segs, segIdx);
+      linesNow[lineIdx] = serializeLine(next);
+      setUndoSnapshot(effectiveContent);
+      setOverride(linesNow.join('\n'));
+    },
+    [effectiveContent, setOverride],
+  );
+
+  const onInsertChord = useCallback(
+    (lineIdx: number, segIdx: number, charOffset: number) => {
+      pendingInsert.current = { lineIdx, segIdx, charOffset };
+      chordPickerRef.current?.present();
+    },
+    [],
+  );
+
+  const onSelectMoveSource = useCallback(
+    (lineIdx: number, segIdx: number) => {
+      const linesNow = effectiveContent.split('\n');
+      const target = linesNow[lineIdx];
+      if (target == null) return;
+      const segs = parseLine(target);
+      const chord = segs[segIdx]?.chord;
+      if (!chord) return;
+      setMovingChord({ lineIdx, segIdx, chord });
+      setSelectingMove(false);
+    },
+    [effectiveContent],
+  );
+
+  const onToggleMoveMode = useCallback(() => {
+    if (movingChord || selectingMove) {
+      setMovingChord(null);
+      setSelectingMove(false);
+    } else {
+      setSelectingMove(true);
+    }
+  }, [movingChord, selectingMove]);
+
+  const onCancelMove = useCallback(() => {
+    setMovingChord(null);
+    setSelectingMove(false);
+  }, []);
+
+  const onMoveTo = useCallback(
+    (toLineIdx: number, toSegIdx: number, charOffset: number) => {
+      const from = movingChord;
+      if (!from) return;
+      const linesNow = effectiveContent.split('\n');
+
+      if (from.lineIdx === toLineIdx) {
+        const segs = parseLine(linesNow[from.lineIdx]);
+        // "Neutraliza" o acorde na origem (mantém texto, mesmo segmento)
+        // para não desalinhar os índices ao inserir.
+        const neutralized = segs.map((s, i) =>
+          i === from.segIdx ? { chord: '', text: s.text } : s,
+        );
+        const inserted = insertChordAt(neutralized, toSegIdx, charOffset, from.chord);
+        linesNow[from.lineIdx] = serializeLine(inserted);
+      } else {
+        const fromSegs = parseLine(linesNow[from.lineIdx]);
+        linesNow[from.lineIdx] = serializeLine(deleteChordAt(fromSegs, from.segIdx));
+        const toSegs = parseLine(linesNow[toLineIdx]);
+        linesNow[toLineIdx] = serializeLine(
+          insertChordAt(toSegs, toSegIdx, charOffset, from.chord),
+        );
+      }
+
+      setUndoSnapshot(effectiveContent);
+      setOverride(linesNow.join('\n'));
+      setMovingChord(null);
+    },
+    [movingChord, effectiveContent, setOverride],
+  );
+
+  // O acorde a mostrar no banner é a versão transposta para a tonalidade actual.
+  const movingChordDisplay = useMemo(() => {
+    if (!movingChord) return null;
+    return transposeChord(movingChord.chord, transposeSemitones, currentKey);
+  }, [movingChord, transposeSemitones, currentKey]);
+
+  const onPickChord = useCallback(
+    (chord: string) => {
+      const pending = pendingInsert.current;
+      pendingInsert.current = null;
+      if (!pending) return;
+      const linesNow = effectiveContent.split('\n');
+      const target = linesNow[pending.lineIdx];
+      if (target == null) return;
+      const segs = parseLine(target);
+      // O acorde escrito é na tonalidade actual; precisamos guardá-lo na
+      // tonalidade original para que a transposição continue a funcionar.
+      const useFlats = preferFlats(originalKey);
+      const inOriginalKey = transposeChord(
+        chord,
+        -transposeSemitones,
+        useFlats ? 'F' : originalKey,
+      );
+      const next = insertChordAt(segs, pending.segIdx, pending.charOffset, inOriginalKey);
+      linesNow[pending.lineIdx] = serializeLine(next);
+      setUndoSnapshot(effectiveContent);
+      setOverride(linesNow.join('\n'));
+    },
+    [effectiveContent, originalKey, transposeSemitones, setOverride],
+  );
+
+  const onUndoDelete = useCallback(() => {
+    if (undoSnapshot == null) return;
+    if (song && undoSnapshot === song.content) clearOverride();
+    else setOverride(undoSnapshot);
+    setUndoSnapshot(null);
+  }, [undoSnapshot, song, clearOverride, setOverride]);
+
+  const onDismissUndo = useCallback(() => setUndoSnapshot(null), []);
+
+  const onToggleEditing = useCallback(() => {
+    setEditing((v) => {
+      const next = !v;
+      if (!next) {
+        setMovingChord(null);
+        setSelectingMove(false);
+      }
+      return next;
+    });
+  }, []);
+  const onResetEdits = useCallback(() => {
+    Alert.alert(
+      'Voltar ao original?',
+      'Todas as tuas edições nesta música serão perdidas.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Voltar ao original',
+          style: 'destructive',
+          onPress: () => {
+            clearOverride();
+            setEditing(false);
+          },
+        },
+      ],
+    );
+  }, [clearOverride]);
+
   const fav = song ? isFavorite(song.id) : false;
   const songIdSafe = song?.id;
   const onToggleFav = useCallback(() => {
@@ -194,16 +357,56 @@ export default function SongScreen() {
         options={{
           title: `${String(song.number).padStart(2, '0')}. ${song.title}`,
           headerRight: () => (
-            <Pressable hitSlop={12} onPress={onToggleFav}>
-              <Ionicons
-                name={fav ? 'heart' : 'heart-outline'}
-                size={22}
-                color={fav ? colors.danger : colors.text}
-              />
-            </Pressable>
+            <View style={styles.headerRight}>
+              {editing ? (
+                <Pressable hitSlop={12} onPress={onToggleMoveMode}>
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={22}
+                    color={selectingMove || movingChord ? colors.accent : colors.text}
+                  />
+                </Pressable>
+              ) : null}
+              {hasOverride ? (
+                <Pressable hitSlop={12} onPress={onResetEdits}>
+                  <Ionicons name="refresh" size={20} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
+              <Pressable hitSlop={12} onPress={onToggleEditing}>
+                <Ionicons
+                  name={editing ? 'checkmark' : 'create-outline'}
+                  size={22}
+                  color={editing ? colors.inTune : colors.text}
+                />
+              </Pressable>
+              <Pressable hitSlop={12} onPress={onToggleFav}>
+                <Ionicons
+                  name={fav ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={fav ? colors.danger : colors.text}
+                />
+              </Pressable>
+            </View>
           ),
         }}
       />
+
+      {selectingMove || movingChord ? (
+        <View style={styles.moveBanner}>
+          <Text style={styles.moveBannerText} numberOfLines={1}>
+            {selectingMove ? (
+              'Toca no acorde que queres mover'
+            ) : (
+              <>
+                A mover <Text style={styles.moveBannerChord}>{movingChordDisplay}</Text> — toca onde queres colocá-lo
+              </>
+            )}
+          </Text>
+          <Pressable hitSlop={8} onPress={onCancelMove}>
+            <Text style={styles.moveBannerCancel}>Cancelar</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <ScrollView
         ref={scrollRef}
@@ -226,10 +429,19 @@ export default function SongScreen() {
             <ChordLine
               key={i}
               line={line}
+              lineIdx={i}
               fontSize={fontSize}
               transpose={transposeSemitones}
               targetKey={currentKey}
               onChordPress={onChordPress}
+              editing={editing}
+              onDeleteChord={onDeleteChord}
+              onInsertChord={onInsertChord}
+              selectingMoveSource={selectingMove}
+              onSelectMoveSource={onSelectMoveSource}
+              isMoving={movingChord != null}
+              movingFromSegIdx={movingChord?.lineIdx === i ? movingChord.segIdx : undefined}
+              onMoveTo={onMoveTo}
             />
           ))}
           <View style={{ height: 120 }} />
@@ -244,6 +456,14 @@ export default function SongScreen() {
         onTogglePlay={onTogglePlay}
         onSpeedChange={setScrollSpeed}
         onClose={onCloseAutoScroll}
+      />
+
+      <UndoSnackbar
+        visible={undoSnapshot != null}
+        message="Acorde apagado"
+        bottomOffset={toolbarBottomOffset(insets.bottom) + TOOLBAR_PILL_HEIGHT + 12}
+        onUndo={onUndoDelete}
+        onDismiss={onDismissUndo}
       />
 
       <SongToolbar
@@ -271,6 +491,12 @@ export default function SongScreen() {
       <FontSheet ref={fontSheetRef} fontSize={fontSize} onChangeFont={onChangeFont} />
 
       <ChordDetailSheet ref={chordDetailRef} defaultInstrument={instrument} />
+
+      <ChordPickerSheet
+        ref={chordPickerRef}
+        suggestions={uniqueChords}
+        onPick={onPickChord}
+      />
     </View>
   );
 }
@@ -296,5 +522,33 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontSize: 12,
     marginBottom: spacing.md,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  moveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surfaceElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing.md,
+  },
+  moveBannerText: {
+    flex: 1,
+    color: colors.text,
+  },
+  moveBannerChord: {
+    color: colors.accent,
+    fontWeight: '700',
+  },
+  moveBannerCancel: {
+    color: colors.primary,
+    fontWeight: '700',
   },
 });
