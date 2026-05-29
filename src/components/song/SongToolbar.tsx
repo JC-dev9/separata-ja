@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import Animated, { AnimatedStyleProp } from 'react-native-reanimated';
+import Animated, { AnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, spacing } from '@/src/theme/colors';
@@ -12,15 +12,22 @@ export function toolbarBottomOffset(insetsBottom: number) {
   return insetsBottom + TOOLBAR_BOTTOM_MARGIN + TOOLBAR_PILL_HEIGHT + spacing.sm;
 }
 
+type EditMode = 'delete' | 'insert' | 'move' | null;
+
 interface Props {
   currentKey: string;
   isOriginalKey: boolean;
   autoScrollOpen: boolean;
-  toolbarStyle?: AnimatedStyleProp<ViewStyle>;
+  toolbarStyle?: AnimatedStyle<ViewStyle>;
+  editing: boolean;
+  editMode: EditMode;
   onPressKey: () => void;
   onPressListen: () => void;
   onPressAutoScroll: () => void;
   onPressFont: () => void;
+  onPressEditMove: () => void;
+  onPressEditDelete: () => void;
+  onPressEditInsert: () => void;
 }
 
 export function SongToolbar({
@@ -28,10 +35,15 @@ export function SongToolbar({
   isOriginalKey,
   autoScrollOpen,
   toolbarStyle,
+  editing,
+  editMode,
   onPressKey,
   onPressListen,
   onPressAutoScroll,
   onPressFont,
+  onPressEditMove,
+  onPressEditDelete,
+  onPressEditInsert,
 }: Props) {
   const insets = useSafeAreaInsets();
 
@@ -41,24 +53,51 @@ export function SongToolbar({
       pointerEvents="box-none"
     >
       <View style={styles.pill}>
-        <ToolbarItem
-          icon="key-outline"
-          label="Tom"
-          badge={currentKey}
-          accent={!isOriginalKey}
-          onPress={onPressKey}
-        />
-        <View style={styles.divider} />
-        <ToolbarItem icon="logo-youtube" label="Ouvir" onPress={onPressListen} />
-        <View style={styles.divider} />
-        <ToolbarItem
-          icon={autoScrollOpen ? 'pause-circle-outline' : 'play-circle-outline'}
-          label="Rolar"
-          accent={autoScrollOpen}
-          onPress={onPressAutoScroll}
-        />
-        <View style={styles.divider} />
-        <ToolbarItem icon="text-outline" label="Texto" onPress={onPressFont} />
+        {editing ? (
+          <>
+            <ToolbarItem
+              icon="swap-horizontal"
+              label="Trocar"
+              accent={editMode === 'move'}
+              onPress={onPressEditMove}
+            />
+            <View style={styles.divider} />
+            <ToolbarItem
+              icon="trash-outline"
+              label="Excluir"
+              accent={editMode === 'delete'}
+              onPress={onPressEditDelete}
+            />
+            <View style={styles.divider} />
+            <ToolbarItem
+              icon="add-circle-outline"
+              label="Adicionar"
+              accent={editMode === 'insert'}
+              onPress={onPressEditInsert}
+            />
+          </>
+        ) : (
+          <>
+            <ToolbarItem
+              icon="key-outline"
+              label="Tom"
+              badge={currentKey}
+              accent={!isOriginalKey}
+              onPress={onPressKey}
+            />
+            <View style={styles.divider} />
+            <ToolbarItem icon="logo-youtube" label="Ouvir" onPress={onPressListen} />
+            <View style={styles.divider} />
+            <ToolbarItem
+              icon={autoScrollOpen ? 'pause-circle-outline' : 'play-circle-outline'}
+              label="Rolar"
+              accent={autoScrollOpen}
+              onPress={onPressAutoScroll}
+            />
+            <View style={styles.divider} />
+            <ToolbarItem icon="text-outline" label="Texto" onPress={onPressFont} />
+          </>
+        )}
       </View>
     </Animated.View>
   );
