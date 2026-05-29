@@ -297,7 +297,7 @@ interface ChipProps {
 }
 
 function ChordChip({ chord, fontSize, height, onPress, standalone, editing, moving, selecting }: ChipProps) {
-  const showDeleteHint = editing && !moving && !selecting;
+  const showDeleteHint = editing && !moving && !selecting && !!onPress;
   const content = (
     <Text
       style={[
