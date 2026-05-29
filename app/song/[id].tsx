@@ -184,7 +184,8 @@ export default function SongScreen() {
 
   const [undoSnapshot, setUndoSnapshot] = useState<string | null>(null);
   const [movingChord, setMovingChord] = useState<{ lineIdx: number; segIdx: number; chord: string } | null>(null);
-  const [selectingMove, setSelectingMove] = useState(false);
+  const [editMode, setEditMode] = useState<'delete' | 'insert' | 'move' | null>(null);
+  const selectingMove = editMode === 'move' && movingChord === null;
   const chordPickerRef = useRef<ChordPickerSheetHandle>(null);
   const pendingInsert = useRef<{ lineIdx: number; segIdx: number; charOffset: number } | null>(null);
 
@@ -219,23 +220,31 @@ export default function SongScreen() {
       const chord = segs[segIdx]?.chord;
       if (!chord) return;
       setMovingChord({ lineIdx, segIdx, chord });
-      setSelectingMove(false);
     },
     [effectiveContent],
   );
 
-  const onToggleMoveMode = useCallback(() => {
-    if (movingChord || selectingMove) {
-      setMovingChord(null);
-      setSelectingMove(false);
-    } else {
-      setSelectingMove(true);
-    }
-  }, [movingChord, selectingMove]);
-
   const onCancelMove = useCallback(() => {
-    setMovingChord(null);
-    setSelectingMove(false);
+    if (movingChord) {
+      setMovingChord(null); // volta a seleccionar origem, mantém modo move
+    } else {
+      setEditMode(null); // sai do modo move
+    }
+  }, [movingChord]);
+
+  const onPressEditMove = useCallback(() => {
+    setEditMode((prev) => {
+      setMovingChord(null);
+      return prev === 'move' ? null : 'move';
+    });
+  }, []);
+
+  const onPressEditDelete = useCallback(() => {
+    setEditMode((prev) => (prev === 'delete' ? null : 'delete'));
+  }, []);
+
+  const onPressEditInsert = useCallback(() => {
+    setEditMode((prev) => (prev === 'insert' ? null : 'insert'));
   }, []);
 
   const onMoveTo = useCallback(
@@ -314,7 +323,7 @@ export default function SongScreen() {
       const next = !v;
       if (!next) {
         setMovingChord(null);
-        setSelectingMove(false);
+        setEditMode(null);
       }
       return next;
     });
@@ -358,15 +367,6 @@ export default function SongScreen() {
           title: `${String(song.number).padStart(2, '0')}. ${song.title}`,
           headerRight: () => (
             <View style={styles.headerRight}>
-              {editing ? (
-                <Pressable hitSlop={12} onPress={onToggleMoveMode}>
-                  <Ionicons
-                    name="swap-horizontal"
-                    size={22}
-                    color={selectingMove || movingChord ? colors.accent : colors.text}
-                  />
-                </Pressable>
-              ) : null}
               {hasOverride ? (
                 <Pressable hitSlop={12} onPress={onResetEdits}>
                   <Ionicons name="refresh" size={20} color={colors.textMuted} />
@@ -435,13 +435,13 @@ export default function SongScreen() {
               targetKey={currentKey}
               onChordPress={onChordPress}
               editing={editing}
-              onDeleteChord={onDeleteChord}
-              onInsertChord={onInsertChord}
+              onDeleteChord={editMode === 'delete' ? onDeleteChord : undefined}
+              onInsertChord={editMode === 'insert' ? onInsertChord : undefined}
               selectingMoveSource={selectingMove}
-              onSelectMoveSource={onSelectMoveSource}
-              isMoving={movingChord != null}
-              movingFromSegIdx={movingChord?.lineIdx === i ? movingChord.segIdx : undefined}
-              onMoveTo={onMoveTo}
+              onSelectMoveSource={editMode === 'move' ? onSelectMoveSource : undefined}
+              isMoving={editMode === 'move' && movingChord != null}
+              movingFromSegIdx={editMode === 'move' && movingChord?.lineIdx === i ? movingChord.segIdx : undefined}
+              onMoveTo={editMode === 'move' ? onMoveTo : undefined}
             />
           ))}
           <View style={{ height: 120 }} />
@@ -471,10 +471,15 @@ export default function SongScreen() {
         isOriginalKey={isOriginalKey}
         autoScrollOpen={autoScrollOpen}
         toolbarStyle={pillAnimatedStyle}
+        editing={editing}
+        editMode={editMode}
         onPressKey={onPressKey}
         onPressListen={onPressListen}
         onPressAutoScroll={onPressAutoScroll}
         onPressFont={onPressFont}
+        onPressEditMove={onPressEditMove}
+        onPressEditDelete={onPressEditDelete}
+        onPressEditInsert={onPressEditInsert}
       />
 
       <KeySheet
