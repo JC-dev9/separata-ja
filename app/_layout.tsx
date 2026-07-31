@@ -8,6 +8,7 @@ import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
+import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 import { loadSongs } from '@/src/data/songs';
 import { hydrateFavorites } from '@/src/hooks/useFavorites';
 import { colors } from '@/src/theme/colors';
@@ -40,22 +41,24 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <ThemeProvider value={navTheme}>
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.background },
-              headerTintColor: colors.text,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="song/[id]" options={{ title: '' }} />
-          </Stack>
-          <StatusBar style="light" />
-        </ThemeProvider>
-      </BottomSheetModalProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheetModalProvider>
+          <ThemeProvider value={navTheme}>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.text,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="song/[id]" options={{ title: '' }} />
+            </Stack>
+            <StatusBar style="light" />
+          </ThemeProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
