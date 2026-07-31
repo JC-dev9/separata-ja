@@ -1,50 +1,138 @@
-# Welcome to your Expo app 👋
+# Saltério
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Hinário digital com cifras, transposição de tons, dicionário de acordes
+(violão e teclado), rolagem automática e afinador de instrumentos.
 
-## Get started
+Construído com [Expo](https://expo.dev) (SDK 54), React Native 0.81 e
+expo-router.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Começar
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Para correr num dispositivo/emulador com código nativo:
 
-## Learn more
+```bash
+npm run android
+npm run ios
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+> O afinador usa o microfone, que não funciona no Expo Go. É preciso uma
+> [development build](https://docs.expo.dev/develop/development-builds/introduction/).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## Verificações
 
-Join our community of developers creating universal apps.
+Os três comandos que o CI corre em cada push e pull request:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm run typecheck   # tsc --noEmit
+npm run lint        # expo lint
+npm test            # jest
+```
+
+Ver `.github/workflows/ci.yml`.
+
+---
+
+## Estrutura
+
+```
+app/                    Rotas (expo-router)
+  (tabs)/               Separadores: hinário, favoritos, afinador
+  song/[id].tsx         Ecrã da música
+src/
+  components/           Componentes de UI
+  data/                 Carregamento do hinário e formas de acordes
+  hooks/                Estado partilhado e persistência
+  utils/                Lógica pura (parser, transposição, pitch)
+  theme/                Paleta e espaçamentos
+assets/database.json    Os 538 hinos
+assets/Logos Separata/  Fontes vetoriais da logo oficial
+```
+
+### Ícones
+
+Os ícones em `assets/images/` são gerados a partir de
+`assets/Logos Separata/Logo Claro.svg`. Se a logo mudar:
+
+```bash
+npm install --no-save sharp
+node scripts/generate-icons.js
+```
+
+A variante **Claro** (`#E5EEFC`) é a usada na app, porque a interface é toda
+escura; a variante **Escuro** (`#0E1E2F`) fica reservada para materiais sobre
+fundo claro.
+
+### Notas de arquitectura
+
+- **Lógica pura isolada.** `chord-parser`, `chord-transposer` e `pitch` não
+  dependem do React nem do React Native, e é onde vive a cobertura de testes.
+- **Persistência sem context.** Os hooks (`useFavorites`, `useSongOverride`,
+  `useFontSize`, `useChordDictionaryCollapsed`) partilham estado através de um
+  cache em módulo com lista de listeners, hidratado do AsyncStorage no arranque.
+  Evita re-renders em cascata numa lista de 538 itens.
+- **Edições do utilizador são versionadas.** Cada edição guarda um hash do
+  conteúdo original em que se baseou. Se o hinário for actualizado, a app
+  detecta a divergência e propõe descartar a versão antiga
+  (ver `useSongOverride`).
+- **Desfazer é de um nível só** e desaparece ao fim de 4 segundos — decisão
+  deliberada para manter a barra de edição simples.
+
+---
+
+## Build e publicação
+
+Requer a [CLI da EAS](https://docs.expo.dev/build/setup/) e sessão iniciada
+(`eas login`).
+
+```bash
+eas build --profile preview --platform android     # APK para testar
+eas build --profile production --platform android  # AAB para a Play Store
+eas build --profile production --platform ios      # IPA para a App Store
+```
+
+A versão (`versionCode`/`buildNumber`) é gerida pela EAS: `eas.json` tem
+`appVersionSource: "remote"` e `autoIncrement` no perfil de produção. Sobe o
+`version` em `app.json` manualmente quando quiseres uma nova versão pública.
+
+### Actualizações OTA
+
+`expo-updates` está instalado com `runtimeVersion.policy: "fingerprint"` — uma
+actualização OTA só chega a binários com dependências nativas compatíveis.
+
+**Falta um passo único de configuração** (precisa de sessão EAS interactiva):
+
+```bash
+eas init                # cria o projeto e escreve extra.eas.projectId
+eas update:configure    # escreve updates.url em app.json
+```
+
+Depois disso, publicar uma correcção de JS sem passar pelas lojas:
+
+```bash
+eas update --branch production --message "corrige X"
+```
+
+---
+
+## Antes de publicar
+
+- [ ] Correr `eas init` e `eas update:configure` (ver acima).
+- [ ] Publicar `PRIVACY.md` num URL público (ex.: GitHub Pages) e usá-lo nas
+      duas lojas — é obrigatório por causa da permissão de microfone.
+- [ ] Preencher o **Data Safety** (Play) e o **App Privacy** (App Store);
+      `PRIVACY.md` tem as respostas coerentes no fim.
+- [ ] Confirmar os direitos de utilização das letras e cifras em
+      `assets/database.json`.
+- [ ] Testar o afinador em dispositivos Android de fabricantes diferentes — a
+      captura de áudio corre num WebView e o comportamento varia.
+- [ ] Rever o `ListenSheet`: carrega o YouTube num WebView com user-agent
+      forjado, o que pode quebrar sem aviso e é mal visto na revisão das lojas.
