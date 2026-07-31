@@ -23,6 +23,8 @@ function SongListItemBase({ song, numberLabel, isFavorite, onPress, onToggleFavo
     <Pressable
       onPress={handlePress}
       android_ripple={{ color: colors.surfaceElevated }}
+      accessibilityRole="button"
+      accessibilityLabel={`Hino ${song.number}, ${song.title}`}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.numberBox}>
@@ -38,7 +40,15 @@ function SongListItemBase({ song, numberLabel, isFavorite, onPress, onToggleFavo
           </Text>
         ) : null}
       </View>
-      <Pressable hitSlop={12} onPress={handleHeart} style={styles.heart}>
+      <Pressable
+        hitSlop={12}
+        onPress={handleHeart}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isFavorite ? `Remover ${song.title} dos favoritos` : `Adicionar ${song.title} aos favoritos`
+        }
+        style={styles.heart}
+      >
         <Ionicons
           name={isFavorite ? 'heart' : 'heart-outline'}
           size={22}

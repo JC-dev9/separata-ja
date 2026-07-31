@@ -27,7 +27,18 @@ export function ChordDictionary({ chords, instrument, onChangeInstrument, onPres
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
-        <Pressable onPress={handleToggle} style={styles.titleRow} hitSlop={8}>
+        <Pressable
+          onPress={handleToggle}
+          accessibilityRole="button"
+          accessibilityLabel={
+            collapsed
+              ? `Mostrar dicionário de acordes, ${chords.length} acordes`
+              : 'Ocultar dicionário de acordes'
+          }
+          accessibilityState={{ expanded: !collapsed }}
+          style={styles.titleRow}
+          hitSlop={8}
+        >
           <MaterialCommunityIcons
             name={collapsed ? 'chevron-right' : 'chevron-down'}
             size={18}
@@ -66,6 +77,8 @@ export function ChordDictionary({ chords, instrument, onChangeInstrument, onPres
             <Pressable
               key={chord}
               onPress={() => onPressChord(chord)}
+              accessibilityRole="button"
+              accessibilityLabel={`Ver o acorde ${chord}`}
               style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
             >
               {instrument === 'guitar' ? (
@@ -92,6 +105,9 @@ function ToggleBtn({ icon, label, active, onPress }: ToggleBtnProps) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Mostrar acordes para ${label}`}
+      accessibilityState={{ selected: active }}
       style={({ pressed }) => [
         styles.toggleBtn,
         active && styles.toggleBtnActive,

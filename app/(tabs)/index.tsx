@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, ListRenderItem, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, ListRenderItem, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROW_HEIGHT, SongListItem } from '@/src/components/SongListItem';
@@ -58,6 +58,7 @@ export default function HomeScreen() {
           style={styles.search}
           placeholder="Buscar por título, autor ou número…"
           placeholderTextColor={colors.textMuted}
+          accessibilityLabel="Buscar hinos por título, autor ou número"
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
@@ -67,12 +68,14 @@ export default function HomeScreen() {
           clearButtonMode="while-editing"
         />
         {query.length > 0 ? (
-          <Ionicons
-            name="close-circle"
-            size={18}
-            color={colors.textMuted}
+          <Pressable
+            hitSlop={8}
             onPress={() => setQuery('')}
-          />
+            accessibilityRole="button"
+            accessibilityLabel="Limpar pesquisa"
+          >
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+          </Pressable>
         ) : null}
       </View>
 

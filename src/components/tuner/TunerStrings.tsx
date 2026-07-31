@@ -23,6 +23,9 @@ export function TunerStrings({
           <Pressable
             key={s.name}
             onPress={() => onSelectString(isSelected ? null : s.name)}
+            accessibilityRole="button"
+            accessibilityLabel={`Corda ${s.label}`}
+            accessibilityState={{ selected: isSelected }}
             style={({ pressed }) => [
               styles.dot,
               isActive && styles.dotActive,

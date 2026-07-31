@@ -233,6 +233,12 @@ function ChordSegment({
               key={i}
               hitSlop={2}
               onPress={handlePress}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isMoving
+                  ? `Colocar o acorde antes de "${tok.text}"`
+                  : `Adicionar acorde antes de "${tok.text}"`
+              }
               style={({ pressed }) => [styles.segment, pressed && { opacity: 0.5 }]}
             >
               <Text style={[hintStyle, { fontSize: fontSize * 0.7, height: chordHeight, lineHeight: chordHeight }]}>{hintChar}</Text>
@@ -314,10 +320,17 @@ function ChordChip({ chord, fontSize, height, onPress, standalone, editing, movi
     </Text>
   );
   if (!onPress) return content;
+  const label = selecting
+    ? `Mover o acorde ${chord}`
+    : showDeleteHint
+      ? `Apagar o acorde ${chord}`
+      : `Ver o acorde ${chord}`;
   return (
     <Pressable
       hitSlop={4}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => pressed && { opacity: 0.5 }}
     >
       {content}

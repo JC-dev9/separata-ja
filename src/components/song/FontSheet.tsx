@@ -51,6 +51,8 @@ export const FontSheet = forwardRef<FontSheetHandle, Props>(function FontSheet(
         <View style={styles.control}>
           <Pressable
             onPress={() => onChangeFont(-1)}
+            accessibilityRole="button"
+            accessibilityLabel="Diminuir tamanho do texto"
             style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
             hitSlop={8}
           >
@@ -58,10 +60,14 @@ export const FontSheet = forwardRef<FontSheetHandle, Props>(function FontSheet(
             <Text style={styles.sign}>−</Text>
           </Pressable>
 
-          <Text style={styles.value}>{fontSize}</Text>
+          <Text style={styles.value} accessibilityLabel={`Tamanho actual: ${fontSize}`}>
+            {fontSize}
+          </Text>
 
           <Pressable
             onPress={() => onChangeFont(+1)}
+            accessibilityRole="button"
+            accessibilityLabel="Aumentar tamanho do texto"
             style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
             hitSlop={8}
           >

@@ -29,12 +29,21 @@ export function UndoSnackbar({
   if (!visible) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: bottomOffset }]}>
+    <View
+      pointerEvents="box-none"
+      accessibilityLiveRegion="polite"
+      style={[styles.wrap, { bottom: bottomOffset }]}
+    >
       <View style={styles.bar}>
         <Text style={styles.message} numberOfLines={1}>
           {message}
         </Text>
-        <Pressable hitSlop={8} onPress={onUndo}>
+        <Pressable
+          hitSlop={8}
+          onPress={onUndo}
+          accessibilityRole="button"
+          accessibilityLabel="Desfazer a última alteração"
+        >
           <Text style={styles.undo}>Desfazer</Text>
         </Pressable>
       </View>

@@ -63,6 +63,9 @@ export const ChordDetailSheet = forwardRef<ChordDetailSheetHandle, Props>(functi
           <View style={styles.toggle}>
             <Pressable
               onPress={() => setInstrument('guitar')}
+              accessibilityRole="button"
+              accessibilityLabel="Mostrar diagrama de violão"
+              accessibilityState={{ selected: instrument === 'guitar' }}
               style={[styles.toggleBtn, instrument === 'guitar' && styles.toggleBtnActive]}
             >
               <Text
@@ -76,6 +79,9 @@ export const ChordDetailSheet = forwardRef<ChordDetailSheetHandle, Props>(functi
             </Pressable>
             <Pressable
               onPress={() => setInstrument('piano')}
+              accessibilityRole="button"
+              accessibilityLabel="Mostrar diagrama de teclado"
+              accessibilityState={{ selected: instrument === 'piano' }}
               style={[styles.toggleBtn, instrument === 'piano' && styles.toggleBtnActive]}
             >
               <Text
@@ -100,6 +106,8 @@ export const ChordDetailSheet = forwardRef<ChordDetailSheetHandle, Props>(functi
 
         <Pressable
           onPress={() => play(chord)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ouvir o acorde ${chord}`}
           style={({ pressed }) => [styles.listenBtn, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="volume-high" size={18} color={colors.background} />

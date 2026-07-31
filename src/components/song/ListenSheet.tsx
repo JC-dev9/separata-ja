@@ -81,6 +81,8 @@ export const ListenSheet = forwardRef<ListenSheetHandle, Props>(function ListenS
         <Pressable
           onPress={() => Linking.openURL(searchUri)}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir no YouTube"
           style={styles.headerBtn}
         >
           <Ionicons name="open-outline" size={18} color={colors.text} />
@@ -88,6 +90,8 @@ export const ListenSheet = forwardRef<ListenSheetHandle, Props>(function ListenS
         <Pressable
           onPress={() => webRef.current?.reload()}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Recarregar"
           style={styles.headerBtn}
         >
           <Ionicons name="refresh" size={18} color={colors.text} />

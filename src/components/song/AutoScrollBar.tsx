@@ -54,6 +54,8 @@ export function AutoScrollBar({
       <View style={styles.bar}>
         <Pressable
           onPress={onTogglePlay}
+          accessibilityRole="button"
+          accessibilityLabel={playing ? 'Pausar rolagem automática' : 'Retomar rolagem automática'}
           style={({ pressed }) => [
             styles.playBtn,
             playing && styles.playBtnActive,
@@ -76,6 +78,7 @@ export function AutoScrollBar({
           />
           <Slider
             style={styles.slider}
+            accessibilityLabel="Velocidade da rolagem automática"
             minimumValue={0}
             maximumValue={1}
             value={speed}
@@ -91,7 +94,13 @@ export function AutoScrollBar({
           />
         </View>
 
-        <Pressable onPress={onClose} hitSlop={10} style={styles.closeBtn}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar rolagem automática"
+          style={styles.closeBtn}
+        >
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </Pressable>
       </View>

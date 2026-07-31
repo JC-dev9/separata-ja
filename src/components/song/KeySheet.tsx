@@ -70,6 +70,8 @@ export const KeySheet = forwardRef<KeySheetHandle, Props>(function KeySheet(
         <View style={styles.tonalCard}>
           <Pressable
             onPress={() => onShiftSemitone(-1)}
+            accessibilityRole="button"
+            accessibilityLabel="Descer meio tom"
             style={({ pressed }) => [styles.tomBtn, pressed && styles.pressed]}
             hitSlop={8}
           >
@@ -87,6 +89,8 @@ export const KeySheet = forwardRef<KeySheetHandle, Props>(function KeySheet(
 
           <Pressable
             onPress={() => onShiftSemitone(1)}
+            accessibilityRole="button"
+            accessibilityLabel="Subir meio tom"
             style={({ pressed }) => [styles.tomBtn, pressed && styles.pressed]}
             hitSlop={8}
           >
@@ -98,6 +102,9 @@ export const KeySheet = forwardRef<KeySheetHandle, Props>(function KeySheet(
         <Pressable
           onPress={onRestore}
           disabled={isOriginal}
+          accessibilityRole="button"
+          accessibilityLabel="Restaurar tom original"
+          accessibilityState={{ disabled: isOriginal }}
           style={({ pressed }) => [
             styles.restore,
             isOriginal && styles.restoreDisabled,
@@ -125,6 +132,9 @@ export const KeySheet = forwardRef<KeySheetHandle, Props>(function KeySheet(
                   <Pressable
                     key={k}
                     onPress={() => onSelectKey(k)}
+                    accessibilityRole="button"
+                    accessibilityLabel={isOrig ? `Tom ${k}, original` : `Tom ${k}`}
+                    accessibilityState={{ selected: active }}
                     style={({ pressed }) => [
                       styles.keyChip,
                       active && styles.keyChipActive,

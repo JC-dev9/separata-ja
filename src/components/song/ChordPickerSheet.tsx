@@ -86,6 +86,8 @@ export const ChordPickerSheet = forwardRef<ChordPickerSheetHandle, Props>(
                     <Pressable
                       key={c}
                       onPress={() => pick(c)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Adicionar o acorde ${c}`}
                       style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
                     >
                       <Text style={styles.chipText}>{c}</Text>
@@ -97,6 +99,8 @@ export const ChordPickerSheet = forwardRef<ChordPickerSheetHandle, Props>(
 
             <Pressable
               onPress={openCustom}
+              accessibilityRole="button"
+              accessibilityLabel="Escrever outro acorde"
               style={({ pressed }) => [styles.outroBtn, pressed && styles.pressed]}
             >
               <Text style={styles.outroBtnText}>Escrever outro acorde…</Text>
@@ -116,13 +120,19 @@ export const ChordPickerSheet = forwardRef<ChordPickerSheetHandle, Props>(
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalBackdrop}
           >
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setCustomOpen(false)} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setCustomOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar"
+            />
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>Outro acorde</Text>
               <TextInput
                 value={custom}
                 onChangeText={setCustom}
                 placeholder="ex: F#m, Bb7"
+                accessibilityLabel="Nome do acorde"
                 placeholderTextColor={colors.textDim}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -132,11 +142,18 @@ export const ChordPickerSheet = forwardRef<ChordPickerSheetHandle, Props>(
                 returnKeyType="done"
               />
               <View style={styles.modalActions}>
-                <Pressable onPress={() => setCustomOpen(false)} hitSlop={8}>
+                <Pressable
+                  onPress={() => setCustomOpen(false)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar"
+                >
                   <Text style={styles.modalCancel}>Cancelar</Text>
                 </Pressable>
                 <Pressable
                   onPress={confirmCustom}
+                  accessibilityRole="button"
+                  accessibilityLabel="Adicionar acorde"
                   style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
                 >
                   <Text style={styles.addBtnText}>Adicionar</Text>

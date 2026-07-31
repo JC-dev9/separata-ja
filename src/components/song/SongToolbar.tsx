@@ -58,6 +58,7 @@ export function SongToolbar({
             <ToolbarItem
               icon="swap-horizontal"
               label="Trocar"
+              accessibilityLabel="Modo mover acorde"
               accent={editMode === 'move'}
               onPress={onPressEditMove}
             />
@@ -65,6 +66,7 @@ export function SongToolbar({
             <ToolbarItem
               icon="trash-outline"
               label="Excluir"
+              accessibilityLabel="Modo apagar acorde"
               accent={editMode === 'delete'}
               onPress={onPressEditDelete}
             />
@@ -72,6 +74,7 @@ export function SongToolbar({
             <ToolbarItem
               icon="add-circle-outline"
               label="Adicionar"
+              accessibilityLabel="Modo adicionar acorde"
               accent={editMode === 'insert'}
               onPress={onPressEditInsert}
             />
@@ -82,20 +85,34 @@ export function SongToolbar({
               icon="key-outline"
               label="Tom"
               badge={currentKey}
+              accessibilityLabel={`Mudar tonalidade, actualmente ${currentKey}`}
               accent={!isOriginalKey}
               onPress={onPressKey}
             />
             <View style={styles.divider} />
-            <ToolbarItem icon="logo-youtube" label="Ouvir" onPress={onPressListen} />
+            <ToolbarItem
+              icon="logo-youtube"
+              label="Ouvir"
+              accessibilityLabel="Ouvir a música no YouTube"
+              onPress={onPressListen}
+            />
             <View style={styles.divider} />
             <ToolbarItem
               icon={autoScrollOpen ? 'pause-circle-outline' : 'play-circle-outline'}
               label="Rolar"
+              accessibilityLabel={
+                autoScrollOpen ? 'Fechar rolagem automática' : 'Abrir rolagem automática'
+              }
               accent={autoScrollOpen}
               onPress={onPressAutoScroll}
             />
             <View style={styles.divider} />
-            <ToolbarItem icon="text-outline" label="Texto" onPress={onPressFont} />
+            <ToolbarItem
+              icon="text-outline"
+              label="Texto"
+              accessibilityLabel="Ajustar tamanho do texto"
+              onPress={onPressFont}
+            />
           </>
         )}
       </View>
@@ -108,14 +125,18 @@ interface ItemProps {
   label: string;
   badge?: string;
   accent?: boolean;
+  accessibilityLabel?: string;
   onPress: () => void;
 }
 
-function ToolbarItem({ icon, label, badge, accent, onPress }: ItemProps) {
+function ToolbarItem({ icon, label, badge, accent, accessibilityLabel, onPress }: ItemProps) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? (badge ? `${label}, ${badge}` : label)}
+      accessibilityState={{ selected: !!accent }}
       style={({ pressed }) => [styles.item, pressed && { opacity: 0.6 }]}
     >
       <Ionicons name={icon} size={20} color={accent ? colors.primary : colors.text} />
