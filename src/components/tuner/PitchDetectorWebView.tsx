@@ -1,96 +1,40 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-export type DetectorMessage =
-  | { type: 'pitch'; frequency: number; level: number }
-  | { type: 'silence'; level: number }
-  | { type: 'ready'; sampleRate: number }
-  | { type: 'error'; error: string };
+import { buildDetectorHtml, DetectorMessage } from '@/src/components/tuner/detector-html';
+import { GUITAR_MAX_HZ, GUITAR_MIN_HZ, searchRangeFor } from '@/src/utils/pitch';
+
+export type { DetectorMessage };
 
 type Props = {
   onMessage: (msg: DetectorMessage) => void;
+  /**
+   * Corda a afinar. Quando definida, a procura fica restrita à volta dela e
+   * tudo o resto no ambiente é ignorado. `null` = modo cromático.
+   */
+  targetFrequency?: number | null;
 };
 
-const HTML = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<style>html,body{margin:0;padding:0;background:transparent;}</style>
-</head>
-<body>
-<script>
-(function(){
-  var send=function(m){try{window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify(m));}catch(e){}};
-  var audioCtx,analyser,sourceNode,buffer,intervalId,running=false;
+export function PitchDetectorWebView({ onMessage, targetFrequency }: Props) {
+  const webRef = useRef<WebView>(null);
 
-  function autoCorrelate(buf,sampleRate){
-    var SIZE=buf.length,sum=0;
-    for(var i=0;i<SIZE;i++){var v=buf[i];sum+=v*v;}
-    var rms=Math.sqrt(sum/SIZE);
-    if(rms<0.01)return{freq:-1,rms:rms};
-    var r1=0,r2=SIZE-1,thres=0.2;
-    for(var i=0;i<SIZE/2;i++)if(Math.abs(buf[i])<thres){r1=i;break;}
-    for(var i=1;i<SIZE/2;i++)if(Math.abs(buf[SIZE-i])<thres){r2=SIZE-i;break;}
-    var slice=buf.subarray(r1,r2);
-    var SIZE2=slice.length;
-    var c=new Float32Array(SIZE2);
-    for(var i=0;i<SIZE2;i++){var s=0;for(var j=0;j<SIZE2-i;j++)s+=slice[j]*slice[j+i];c[i]=s;}
-    var d=0;while(d<SIZE2-1&&c[d]>c[d+1])d++;
-    var maxval=-1,maxpos=-1;
-    for(var i=d;i<SIZE2;i++)if(c[i]>maxval){maxval=c[i];maxpos=i;}
-    if(maxpos<=0||maxval<=0)return{freq:-1,rms:rms};
-    var thr=maxval*0.9;
-    var T0=maxpos;
-    for(var i=d+1;i<SIZE2-1;i++){
-      if(c[i]>=thr&&c[i]>=c[i-1]&&c[i]>c[i+1]){T0=i;break;}
-    }
-    var x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;
-    var a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
-    if(a)T0=T0-b/(2*a);
-    if(T0<=0)return{freq:-1,rms:rms};
-    return{freq:sampleRate/T0,rms:rms};
-  }
+  // O HTML é construído uma única vez: mudar a gama depois faz-se por
+  // injeção, senão o WebView recarregava e pedia o microfone outra vez.
+  const html = useMemo(() => buildDetectorHtml(GUITAR_MIN_HZ, GUITAR_MAX_HZ), []);
 
-  function tick(){
-    if(!running||!analyser)return;
-    analyser.getFloatTimeDomainData(buffer);
-    var r=autoCorrelate(buffer,audioCtx.sampleRate);
-    if(r.freq>50&&r.freq<2000){
-      send({type:'pitch',frequency:r.freq,level:r.rms});
-    }else{
-      send({type:'silence',level:r.rms});
-    }
-  }
+  const range = useMemo(() => searchRangeFor(targetFrequency), [targetFrequency]);
 
-  async function start(){
-    try{
-      var stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,autoGainControl:false,noiseSuppression:false}});
-      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-      analyser=audioCtx.createAnalyser();
-      analyser.fftSize=2048;
-      sourceNode=audioCtx.createMediaStreamSource(stream);
-      sourceNode.connect(analyser);
-      buffer=new Float32Array(analyser.fftSize);
-      running=true;
-      send({type:'ready',sampleRate:audioCtx.sampleRate});
-      intervalId=setInterval(tick,90);
-    }catch(e){
-      var name=(e&&e.name)?e.name:'Error';
-      var msg=(e&&e.message)?e.message:String(e);
-      var has=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
-      send({type:'error',error:name+': '+msg+' (gUM='+has+', secure='+window.isSecureContext+')'});
-    }
-  }
+  const applyRange = useCallback(() => {
+    webRef.current?.injectJavaScript(
+      `window.__setRange && window.__setRange(${range.minHz},${range.maxHz}); true;`,
+    );
+  }, [range]);
 
-  start();
-})();
-</script>
-</body>
-</html>`;
+  useEffect(() => {
+    applyRange();
+  }, [applyRange]);
 
-export function PitchDetectorWebView({ onMessage }: Props) {
   const handleMessage = useCallback(
     (e: WebViewMessageEvent) => {
       try {
@@ -103,9 +47,22 @@ export function PitchDetectorWebView({ onMessage }: Props) {
     [onMessage],
   );
 
+  // `onPermissionRequest` só existe no Android e não consta dos tipos do
+  // react-native-webview; sem ela o WebView nunca recebe áudio no Android.
+  const androidOnlyProps = {
+    onPermissionRequest: (event: any) => {
+      const ne = event?.nativeEvent;
+      if (ne && typeof ne.grant === 'function') {
+        ne.grant(ne.resources ?? ['android.webkit.resource.AUDIO_CAPTURE']);
+      }
+    },
+  } as Record<string, unknown>;
+
   return (
     <WebView
-      source={{ html: HTML, baseUrl: 'https://localhost' }}
+      ref={webRef}
+      {...androidOnlyProps}
+      source={{ html, baseUrl: 'https://localhost' }}
       style={styles.hidden}
       containerStyle={styles.hidden}
       mediaPlaybackRequiresUserAction={false}
@@ -117,12 +74,9 @@ export function PitchDetectorWebView({ onMessage }: Props) {
       originWhitelist={['*']}
       mixedContentMode="always"
       onMessage={handleMessage}
-      onPermissionRequest={(event: any) => {
-        const ne = event?.nativeEvent;
-        if (ne && typeof ne.grant === 'function') {
-          ne.grant(ne.resources ?? ['android.webkit.resource.AUDIO_CAPTURE']);
-        }
-      }}
+      // Garante que a gama actual é aplicada mesmo que a página só fique
+      // pronta depois de o utilizador já ter escolhido uma corda.
+      onLoadEnd={applyRange}
       pointerEvents="none"
     />
   );

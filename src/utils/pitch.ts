@@ -17,6 +17,35 @@ export const STANDARD_GUITAR_TUNING: GuitarString[] = [
   { name: 'E4', label: '1ª · E', frequency: 329.628 },
 ];
 
+// Gama de procura em modo cromático: da 6ª corda com folga até bem acima da 1ª.
+// Restringir a procura é a primeira defesa contra ruído de ambiente — o que
+// está fora desta janela nunca chega a ser considerado uma nota.
+export const GUITAR_MIN_HZ = 65;
+export const GUITAR_MAX_HZ = 450;
+
+/** Meio-tons acima e abaixo da corda escolhida no modo "Por corda". */
+export const STRING_RANGE_SEMITONES = 6;
+
+/**
+ * Janela de frequências onde o detetor deve procurar.
+ *
+ * Com uma corda escolhida, aperta a janela à volta dela: assim uma voz ou um
+ * instrumento noutra oitava não conseguem ser lidos como sendo aquela corda.
+ * Sem corda escolhida (modo cromático), usa a gama do violão.
+ */
+export function searchRangeFor(targetFrequency: number | null | undefined): {
+  minHz: number;
+  maxHz: number;
+} {
+  if (targetFrequency == null || !isFinite(targetFrequency) || targetFrequency <= 0) {
+    return { minHz: GUITAR_MIN_HZ, maxHz: GUITAR_MAX_HZ };
+  }
+  return {
+    minHz: targetFrequency * Math.pow(2, -STRING_RANGE_SEMITONES / 12),
+    maxHz: targetFrequency * Math.pow(2, STRING_RANGE_SEMITONES / 12),
+  };
+}
+
 export type PitchInfo = {
   frequency: number;
   noteName: string;

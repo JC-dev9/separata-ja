@@ -3,7 +3,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { setAudioModeAsync } from 'expo-audio';
 import * as Linking from 'expo-linking';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PitchDetectorWebView } from '@/src/components/tuner/PitchDetectorWebView';
@@ -13,7 +13,7 @@ import {
   TunerNeedle,
 } from '@/src/components/tuner/TunerNeedle';
 import { TunerStrings } from '@/src/components/tuner/TunerStrings';
-import { useTuner } from '@/src/hooks/useTuner';
+import { DetectorErrorCode, useTuner } from '@/src/hooks/useTuner';
 import { colors, radius, spacing } from '@/src/theme/colors';
 import { STANDARD_GUITAR_TUNING } from '@/src/utils/pitch';
 
@@ -21,6 +21,7 @@ export default function TunerScreen() {
   const isFocused = useIsFocused();
   const tuner = useTuner(isFocused);
   const [selectedString, setSelectedString] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -96,6 +97,8 @@ export default function TunerScreen() {
             do sistema.
           </Text>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir definições do sistema"
             style={({ pressed }) => [
               styles.settingsBtn,
               pressed && { opacity: 0.85 },
@@ -105,6 +108,8 @@ export default function TunerScreen() {
             <Text style={styles.settingsBtnText}>Abrir definições</Text>
           </Pressable>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pedir novamente acesso ao microfone"
             style={({ pressed }) => [
               styles.retryBtn,
               pressed && { opacity: 0.7 },
@@ -171,14 +176,65 @@ export default function TunerScreen() {
           onSelectString={setSelectedString}
         />
 
-        <Text style={styles.status}>{status}</Text>
+        <View style={styles.statusWrap}>
+          <Text style={styles.status} accessibilityLiveRegion="polite">
+            {status}
+          </Text>
+
+          {tuner.error ? (
+            <>
+              <Pressable
+                onPress={() => setShowDiagnostics((v) => !v)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showDiagnostics ? 'Ocultar detalhes técnicos' : 'Mostrar detalhes técnicos'
+                }
+                accessibilityState={{ expanded: showDiagnostics }}
+              >
+                <Text style={styles.diagnosticsToggle}>
+                  {showDiagnostics ? 'Ocultar detalhes' : 'Detalhes técnicos'}
+                </Text>
+              </Pressable>
+              {showDiagnostics ? (
+                // Serve para o utilizador conseguir reportar em que dispositivo
+                // falhou — é o que decide se vale a pena um módulo nativo.
+                <Text style={styles.diagnosticsText} selectable>
+                  {`${Platform.OS} ${String(Platform.Version)}\n${tuner.errorCode ?? 'sem código'}\n${tuner.error}`}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
+        </View>
       </View>
 
       {isFocused && tuner.permission === 'granted' ? (
-        <PitchDetectorWebView onMessage={tuner.handleMessage} />
+        <PitchDetectorWebView
+          onMessage={tuner.handleMessage}
+          targetFrequency={selectedTarget?.frequency ?? null}
+        />
       ) : null}
     </SafeAreaView>
   );
+}
+
+// Mensagens acionáveis em vez do erro técnico cru do WebView.
+// O detalhe original fica acessível a pedido, para diagnóstico.
+function describeError(code: DetectorErrorCode | null): string {
+  switch (code) {
+    case 'denied':
+      return 'O acesso ao microfone foi bloqueado.';
+    case 'no-device':
+      return 'Não foi encontrado nenhum microfone neste dispositivo.';
+    case 'busy':
+      return 'O microfone está a ser usado por outra aplicação.';
+    case 'unsupported':
+      return 'Este dispositivo não suporta a captura de áudio necessária. Actualiza o Android System WebView na Play Store.';
+    case 'detector-broken':
+      return 'O afinador não conseguiu arrancar neste dispositivo. Comunica-nos os detalhes técnicos abaixo.';
+    default:
+      return 'Não foi possível iniciar o afinador.';
+  }
 }
 
 function describeStatus(
@@ -186,7 +242,7 @@ function describeStatus(
   cents: number | null,
   active: boolean,
 ): string {
-  if (tuner.error) return tuner.error;
+  if (tuner.error) return describeError(tuner.errorCode);
   if (tuner.permission === 'undetermined') return 'A pedir permissão…';
   if (!tuner.ready) return 'A iniciar microfone…';
   if (!active) return 'Toca uma corda';
@@ -207,6 +263,9 @@ function ModeChip({ label, active, onPress }: ModeChipProps) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Modo ${label}`}
+      accessibilityState={{ selected: active }}
       style={({ pressed }) => [
         styles.chip,
         active && styles.chipActive,
@@ -285,11 +344,29 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     height: 18,
   },
+  statusWrap: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'stretch',
+  },
   status: {
     color: colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
     minHeight: 20,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  diagnosticsToggle: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  diagnosticsText: {
+    color: colors.textDim,
+    fontSize: 11,
+    fontFamily: 'monospace',
     textAlign: 'center',
     paddingHorizontal: spacing.md,
   },
