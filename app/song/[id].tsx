@@ -48,7 +48,10 @@ export default function SongScreen() {
   const [instrument, setInstrument] = useState<Instrument>('guitar');
   const [editing, setEditing] = useState(false);
 
-  const { override, setOverride, clearOverride, hasOverride } = useSongOverride(song?.id);
+  const { override, setOverride, clearOverride, hasOverride, isStale } = useSongOverride(
+    song?.id,
+    song?.content,
+  );
   const effectiveContent = override ?? song?.content ?? '';
 
   // Pre-split content + base chord set.
@@ -346,6 +349,26 @@ export default function SongScreen() {
     );
   }, [clearOverride]);
 
+  // A edição guardada baseia-se numa versão do hinário que entretanto mudou.
+  // Avisamos em vez de deixar o utilizador preso a texto desactualizado.
+  const onDiscardStale = useCallback(() => {
+    Alert.alert(
+      'Esta música foi actualizada',
+      'A tua versão editada baseia-se numa versão anterior. Queres descartar as tuas edições e usar a versão actualizada?',
+      [
+        { text: 'Manter a minha', style: 'cancel' },
+        {
+          text: 'Usar a actualizada',
+          style: 'destructive',
+          onPress: () => {
+            clearOverride();
+            setEditing(false);
+          },
+        },
+      ],
+    );
+  }, [clearOverride]);
+
   const fav = song ? isFavorite(song.id) : false;
   const songIdSafe = song?.id;
   const onToggleFav = useCallback(() => {
@@ -368,18 +391,35 @@ export default function SongScreen() {
           headerRight: () => (
             <View style={styles.headerRight}>
               {hasOverride ? (
-                <Pressable hitSlop={12} onPress={onResetEdits}>
+                <Pressable
+                  hitSlop={12}
+                  onPress={onResetEdits}
+                  accessibilityRole="button"
+                  accessibilityLabel="Repor a versão original da música"
+                >
                   <Ionicons name="refresh" size={20} color={colors.textMuted} />
                 </Pressable>
               ) : null}
-              <Pressable hitSlop={12} onPress={onToggleEditing}>
+              <Pressable
+                hitSlop={12}
+                onPress={onToggleEditing}
+                accessibilityRole="button"
+                accessibilityLabel={editing ? 'Concluir edição de acordes' : 'Editar acordes'}
+                accessibilityState={{ selected: editing }}
+              >
                 <Ionicons
                   name={editing ? 'checkmark' : 'create-outline'}
                   size={22}
                   color={editing ? colors.inTune : colors.text}
                 />
               </Pressable>
-              <Pressable hitSlop={12} onPress={onToggleFav}>
+              <Pressable
+                hitSlop={12}
+                onPress={onToggleFav}
+                accessibilityRole="button"
+                accessibilityLabel={fav ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+                accessibilityState={{ selected: fav }}
+              >
                 <Ionicons
                   name={fav ? 'heart' : 'heart-outline'}
                   size={22}
@@ -390,6 +430,21 @@ export default function SongScreen() {
           ),
         }}
       />
+
+      {isStale ? (
+        <Pressable
+          style={styles.staleBanner}
+          onPress={onDiscardStale}
+          accessibilityRole="button"
+          accessibilityLabel="Esta música foi actualizada. Toca para rever as tuas edições."
+        >
+          <Ionicons name="information-circle-outline" size={18} color={colors.background} />
+          <Text style={styles.staleBannerText} numberOfLines={2}>
+            Esta música foi actualizada. As tuas edições baseiam-se numa versão anterior.
+          </Text>
+          <Text style={styles.staleBannerAction}>Rever</Text>
+        </Pressable>
+      ) : null}
 
       {selectingMove || movingChord ? (
         <View style={styles.moveBanner}>
@@ -532,6 +587,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  staleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.primary,
+    gap: spacing.sm,
+  },
+  staleBannerText: {
+    flex: 1,
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  staleBannerAction: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
   moveBanner: {
     flexDirection: 'row',
