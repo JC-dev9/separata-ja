@@ -1,5 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
+
+import { readStorage, writeStorage } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:fontSize';
 const DEFAULT_FONT_SIZE = 19;
@@ -12,7 +13,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(size: number) => void>();
 
 function persist(size: number) {
-  AsyncStorage.setItem(STORAGE_KEY, String(size)).catch(() => {});
+  writeStorage(STORAGE_KEY, String(size));
 }
 
 function notify() {
@@ -22,7 +23,7 @@ function notify() {
 function hydrate(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = AsyncStorage.getItem(STORAGE_KEY)
+  hydrating = readStorage(STORAGE_KEY)
     .then((raw) => {
       const parsed = raw !== null ? parseInt(raw, 10) : NaN;
       cached = !isNaN(parsed) ? Math.min(MAX_FONT, Math.max(MIN_FONT, parsed)) : DEFAULT_FONT_SIZE;

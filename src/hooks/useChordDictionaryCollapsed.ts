@@ -1,5 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
+
+import { readStorage, writeStorage } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:chordDictionaryCollapsed';
 
@@ -9,7 +10,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(v: boolean) => void>();
 
 function persist(value: boolean) {
-  AsyncStorage.setItem(STORAGE_KEY, value ? '1' : '0').catch(() => {});
+  writeStorage(STORAGE_KEY, value ? '1' : '0');
 }
 
 function notify() {
@@ -19,7 +20,7 @@ function notify() {
 function hydrate(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = AsyncStorage.getItem(STORAGE_KEY)
+  hydrating = readStorage(STORAGE_KEY)
     .then((raw) => {
       if (raw !== null) cached = raw === '1';
       hydrated = true;

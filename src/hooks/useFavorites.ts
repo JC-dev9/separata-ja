@@ -1,5 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
+
+import { readStorage, writeStorage } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:favorites';
 
@@ -9,7 +10,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(ids: Set<number>) => void>();
 
 function persist(ids: Set<number>) {
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids))).catch(() => {});
+  writeStorage(STORAGE_KEY, JSON.stringify(Array.from(ids)));
 }
 
 function notify() {
@@ -20,12 +21,13 @@ function notify() {
 export function hydrateFavorites(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = AsyncStorage.getItem(STORAGE_KEY)
+  hydrating = readStorage(STORAGE_KEY)
     .then((raw) => {
       try {
         const ids: number[] = raw ? JSON.parse(raw) : [];
         memoryCache = new Set(ids);
-      } catch {
+      } catch (err) {
+        if (__DEV__) console.warn('[favorites] dados corrompidos, a reiniciar:', err);
         memoryCache = new Set();
       }
       hydrated = true;
