@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { readStorage, writeStorage } from '@/src/utils/storage';
+import { createStorageSlot } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:chordDictionaryCollapsed';
+
+const slot = createStorageSlot(STORAGE_KEY);
 
 let cached = false;
 let hydrated = false;
@@ -10,7 +12,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(v: boolean) => void>();
 
 function persist(value: boolean) {
-  writeStorage(STORAGE_KEY, value ? '1' : '0');
+  slot.write(value ? '1' : '0');
 }
 
 function notify() {
@@ -20,15 +22,11 @@ function notify() {
 function hydrate(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = readStorage(STORAGE_KEY)
-    .then((raw) => {
-      if (raw !== null) cached = raw === '1';
-      hydrated = true;
-      notify();
-    })
-    .catch(() => {
-      hydrated = true;
-    });
+  hydrating = slot.read().then((result) => {
+    if (result.ok && result.value !== null) cached = result.value === '1';
+    hydrated = true;
+    notify();
+  });
   return hydrating;
 }
 

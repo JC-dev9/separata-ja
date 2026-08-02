@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { readStorage, writeStorage } from '@/src/utils/storage';
+import { createStorageSlot } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:fontSize';
 const DEFAULT_FONT_SIZE = 19;
 const MIN_FONT = 12;
 const MAX_FONT = 28;
+
+const slot = createStorageSlot(STORAGE_KEY);
 
 let cached: number = DEFAULT_FONT_SIZE;
 let hydrated = false;
@@ -13,7 +15,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(size: number) => void>();
 
 function persist(size: number) {
-  writeStorage(STORAGE_KEY, String(size));
+  slot.write(String(size));
 }
 
 function notify() {
@@ -23,16 +25,16 @@ function notify() {
 function hydrate(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = readStorage(STORAGE_KEY)
-    .then((raw) => {
-      const parsed = raw !== null ? parseInt(raw, 10) : NaN;
+  hydrating = slot.read().then((result) => {
+    // Se a leitura falhou ficamos no valor por omissão sem gravar nada, para não
+    // apagar o tamanho que o utilizador tinha escolhido.
+    if (result.ok) {
+      const parsed = result.value !== null ? parseInt(result.value, 10) : NaN;
       cached = !isNaN(parsed) ? Math.min(MAX_FONT, Math.max(MIN_FONT, parsed)) : DEFAULT_FONT_SIZE;
-      hydrated = true;
-      notify();
-    })
-    .catch(() => {
-      hydrated = true;
-    });
+    }
+    hydrated = true;
+    notify();
+  });
   return hydrating;
 }
 

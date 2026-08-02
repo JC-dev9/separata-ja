@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { readStorage, writeStorage } from '@/src/utils/storage';
+import { createStorageSlot } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:favorites';
+
+const slot = createStorageSlot(STORAGE_KEY);
 
 let memoryCache: Set<number> = new Set();
 let hydrated = false;
@@ -10,7 +12,7 @@ let hydrating: Promise<void> | null = null;
 const listeners = new Set<(ids: Set<number>) => void>();
 
 function persist(ids: Set<number>) {
-  writeStorage(STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  slot.write(JSON.stringify(Array.from(ids)));
 }
 
 function notify() {
@@ -21,21 +23,23 @@ function notify() {
 export function hydrateFavorites(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = readStorage(STORAGE_KEY)
-    .then((raw) => {
+  hydrating = slot.read().then((result) => {
+    // Falha de leitura: ficamos com o cache vazio, mas o slot já suspendeu as
+    // escritas, por isso os favoritos no disco não correm risco de ser apagados.
+    if (result.ok) {
       try {
-        const ids: number[] = raw ? JSON.parse(raw) : [];
+        const ids: number[] = result.value ? JSON.parse(result.value) : [];
         memoryCache = new Set(ids);
       } catch (err) {
+        // Corrompido é diferente de ilegível: aqui vimos o conteúdo e ele não
+        // presta, por isso reiniciar e voltar a gravar por cima é seguro.
         if (__DEV__) console.warn('[favorites] dados corrompidos, a reiniciar:', err);
         memoryCache = new Set();
       }
-      hydrated = true;
-      notify();
-    })
-    .catch(() => {
-      hydrated = true;
-    });
+    }
+    hydrated = true;
+    notify();
+  });
   return hydrating;
 }
 

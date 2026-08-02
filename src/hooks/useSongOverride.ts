@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { readStorage, writeStorage } from '@/src/utils/storage';
+import { createStorageSlot } from '@/src/utils/storage';
 
 const STORAGE_KEY = '@psalterio:song-overrides';
+
+const slot = createStorageSlot(STORAGE_KEY);
 
 // Cada edição guarda também uma impressão digital do conteúdo original em que
 // se baseou. Se um dia actualizarmos o hinário (corrigir uma letra, acertar
@@ -21,10 +23,17 @@ type Overrides = Record<number, OverrideEntry>;
 // compatível para não deitar fora edições de utilizadores que já actualizaram.
 type StoredOverrides = Record<number, OverrideEntry | string>;
 
+interface Snapshot {
+  overrides: Overrides;
+  /** A última gravação não chegou ao disco. */
+  saveFailed: boolean;
+}
+
 let memoryCache: Overrides = {};
+let saveFailed = false;
 let hydrated = false;
 let hydrating: Promise<void> | null = null;
-const listeners = new Set<(o: Overrides) => void>();
+const listeners = new Set<(s: Snapshot) => void>();
 
 /**
  * Hash FNV-1a de 32 bits em hexadecimal. Não é criptográfico — só precisamos
@@ -55,51 +64,87 @@ function migrate(stored: StoredOverrides): Overrides {
   return out;
 }
 
-function persist(o: Overrides) {
-  writeStorage(STORAGE_KEY, JSON.stringify(o));
+function notify() {
+  const snapshot: Snapshot = { overrides: { ...memoryCache }, saveFailed };
+  listeners.forEach((fn) => fn(snapshot));
 }
 
-function notify() {
-  const snapshot = { ...memoryCache };
-  listeners.forEach((fn) => fn(snapshot));
+/**
+ * Grava e regista se resultou.
+ *
+ * Nos favoritos ou no tamanho da letra uma gravação falhada não vale um aviso —
+ * refaz-se com um toque. Aqui o utilizador escreveu o conteúdo à mão, por isso
+ * a app diz-lhe que a edição não ficou guardada em vez de o deixar descobrir
+ * quando reabrir a música.
+ */
+function persist(o: Overrides): Promise<void> {
+  return slot.write(JSON.stringify(o)).then((ok) => {
+    const failed = !ok;
+    if (failed === saveFailed) return;
+    saveFailed = failed;
+    notify();
+  });
+}
+
+export function setOverrideFor(songId: number, content: string, baseHash: string): Promise<void> {
+  memoryCache = { ...memoryCache, [songId]: { content, baseHash } };
+  notify();
+  return persist(memoryCache);
+}
+
+export function clearOverrideFor(songId: number): Promise<void> {
+  const { [songId]: _removed, ...rest } = memoryCache;
+  memoryCache = rest;
+  notify();
+  return persist(memoryCache);
+}
+
+/** `true` quando a última gravação de edições não chegou ao disco. */
+export function hasSaveFailed(): boolean {
+  return saveFailed;
 }
 
 export function hydrateOverrides(): Promise<void> {
   if (hydrated) return Promise.resolve();
   if (hydrating) return hydrating;
-  hydrating = readStorage(STORAGE_KEY)
-    .then((raw) => {
+  hydrating = slot.read().then((result) => {
+    // Falha de leitura: seguimos sem edições em memória, mas o slot suspendeu
+    // as escritas. Aqui isso é crítico — gravar levaria à frente as edições de
+    // todas as músicas de uma vez, porque vivem todas nesta chave.
+    if (result.ok) {
       try {
-        memoryCache = raw ? migrate(JSON.parse(raw) as StoredOverrides) : {};
+        memoryCache = result.value ? migrate(JSON.parse(result.value) as StoredOverrides) : {};
       } catch (err) {
         if (__DEV__) console.warn('[overrides] dados corrompidos, a reiniciar:', err);
         memoryCache = {};
       }
-      hydrated = true;
-      notify();
-    })
-    .catch(() => {
-      hydrated = true;
-    });
+    }
+    hydrated = true;
+    notify();
+  });
   return hydrating;
 }
 
 hydrateOverrides();
 
 export function useSongOverride(songId: number | undefined, originalContent?: string) {
-  const [overrides, setOverrides] = useState<Overrides>(memoryCache);
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
+    overrides: memoryCache,
+    saveFailed,
+  }));
 
   useEffect(() => {
     if (!hydrated) {
-      hydrateOverrides().then(() => setOverrides({ ...memoryCache }));
+      hydrateOverrides().then(() => setSnapshot({ overrides: { ...memoryCache }, saveFailed }));
     }
-    const listener = (o: Overrides) => setOverrides(o);
+    const listener = (s: Snapshot) => setSnapshot(s);
     listeners.add(listener);
     return () => {
       listeners.delete(listener);
     };
   }, []);
 
+  const { overrides } = snapshot;
   const entry = songId != null ? overrides[songId] : undefined;
   const originalHash = useMemo(
     () => (originalContent != null ? hashContent(originalContent) : ''),
@@ -114,19 +159,14 @@ export function useSongOverride(songId: number | undefined, originalContent?: st
   const setOverride = useCallback(
     (content: string) => {
       if (songId == null) return;
-      memoryCache = { ...memoryCache, [songId]: { content, baseHash: originalHash } };
-      notify();
-      persist(memoryCache);
+      setOverrideFor(songId, content, originalHash);
     },
     [songId, originalHash],
   );
 
   const clearOverride = useCallback(() => {
     if (songId == null) return;
-    const { [songId]: _, ...rest } = memoryCache;
-    memoryCache = rest;
-    notify();
-    persist(memoryCache);
+    clearOverrideFor(songId);
   }, [songId]);
 
   return {
@@ -135,5 +175,6 @@ export function useSongOverride(songId: number | undefined, originalContent?: st
     clearOverride,
     hasOverride: entry != null,
     isStale,
+    saveFailed: snapshot.saveFailed,
   };
 }
