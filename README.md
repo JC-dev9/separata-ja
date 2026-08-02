@@ -79,6 +79,15 @@ fundo claro.
   `useFontSize`, `useChordDictionaryCollapsed`) partilham estado através de um
   cache em módulo com lista de listeners, hidratado do AsyncStorage no arranque.
   Evita re-renders em cascata numa lista de 538 itens.
+- **Uma leitura falhada nunca apaga o disco.** `readStorage` distingue "a chave
+  não existe" de "falhou a ler". Se a hidratação falhar, o estado em memória são
+  valores por omissão e o disco pode ter os dados do utilizador, por isso o
+  `createStorageSlot` suspende as escritas dessa chave até ao arranque seguinte
+  (com uma re-tentativa, que só desbloqueia se o disco estiver mesmo vazio).
+  Ver `src/utils/storage.ts`.
+- **Gravações falhadas são visíveis onde importam.** Uma edição que não chega ao
+  disco levanta um aviso no ecrã da música (`saveFailed` em `useSongOverride`).
+  Nos favoritos e no tamanho da letra não se avisa — refaz-se com um toque.
 - **Edições do utilizador são versionadas.** Cada edição guarda um hash do
   conteúdo original em que se baseou. Se o hinário for actualizado, a app
   detecta a divergência e propõe descartar a versão antiga
