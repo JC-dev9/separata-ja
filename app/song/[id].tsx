@@ -48,10 +48,8 @@ export default function SongScreen() {
   const [instrument, setInstrument] = useState<Instrument>('guitar');
   const [editing, setEditing] = useState(false);
 
-  const { override, setOverride, clearOverride, hasOverride, isStale } = useSongOverride(
-    song?.id,
-    song?.content,
-  );
+  const { override, setOverride, clearOverride, hasOverride, isStale, saveFailed } =
+    useSongOverride(song?.id, song?.content);
   const effectiveContent = override ?? song?.content ?? '';
 
   // Pre-split content + base chord set.
@@ -431,6 +429,16 @@ export default function SongScreen() {
         }}
       />
 
+      {saveFailed ? (
+        <View style={styles.saveFailedBanner} accessibilityLiveRegion="polite">
+          <Ionicons name="warning-outline" size={18} color={colors.background} />
+          <Text style={styles.saveFailedText}>
+            Não foi possível guardar esta edição. Continua visível agora, mas
+            pode perder-se se fechares a aplicação.
+          </Text>
+        </View>
+      ) : null}
+
       {isStale ? (
         <Pressable
           style={styles.staleBanner}
@@ -587,6 +595,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  saveFailedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.danger,
+    gap: spacing.sm,
+  },
+  saveFailedText: {
+    flex: 1,
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '600',
   },
   staleBanner: {
     flexDirection: 'row',
