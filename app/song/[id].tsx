@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,13 +18,13 @@ import {
 import { ChordDictionary, Instrument } from '@/src/components/song/ChordDictionary';
 import { FontSheet, FontSheetHandle } from '@/src/components/song/FontSheet';
 import { KeySheet, KeySheetHandle } from '@/src/components/song/KeySheet';
-import { ListenSheet, ListenSheetHandle } from '@/src/components/song/ListenSheet';
 import { SongToolbar, TOOLBAR_BOTTOM_MARGIN, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
 import { UndoSnackbar } from '@/src/components/song/UndoSnackbar';
 import { getSongById } from '@/src/data/songs';
 import { useFavorites } from '@/src/hooks/useFavorites';
 import { useFontSize } from '@/src/hooks/useFontSize';
 import { colors, spacing } from '@/src/theme/colors';
+import { youtubeSearchUrl } from '@/src/utils/youtube';
 import {
   detectOriginalKey,
   extractUniqueChords,
@@ -120,7 +121,6 @@ export default function SongScreen() {
 
   // Sheets
   const keySheetRef = useRef<KeySheetHandle>(null);
-  const listenSheetRef = useRef<ListenSheetHandle>(null);
   const chordDetailRef = useRef<ChordDetailSheetHandle>(null);
   const fontSheetRef = useRef<FontSheetHandle>(null);
 
@@ -165,7 +165,17 @@ export default function SongScreen() {
   }, [changeFont]);
 
   const onPressKey = useCallback(() => keySheetRef.current?.present(), []);
-  const onPressListen = useCallback(() => listenSheetRef.current?.present(), []);
+  // Sai da app de propósito: o YouTube passa a correr na aplicação dele ou no
+  // browser, onde funciona sempre e é o que os termos deles permitem.
+  const onPressListen = useCallback(() => {
+    if (!song) return;
+    Linking.openURL(youtubeSearchUrl(song.title)).catch(() => {
+      Alert.alert(
+        'Não foi possível abrir o YouTube',
+        'Não há nenhuma aplicação neste dispositivo capaz de abrir a ligação.',
+      );
+    });
+  }, [song]);
   const onPressFont = useCallback(() => fontSheetRef.current?.present(), []);
   const onPressAutoScroll = useCallback(() => {
     setAutoScrollOpen((v) => {
@@ -553,8 +563,6 @@ export default function SongScreen() {
         onShiftSemitone={onShiftSemitone}
         onRestore={onRestoreKey}
       />
-
-      <ListenSheet ref={listenSheetRef} songTitle={song.title} />
 
       <FontSheet ref={fontSheetRef} fontSize={fontSize} onChangeFont={onChangeFont} />
 

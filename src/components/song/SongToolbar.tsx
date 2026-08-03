@@ -93,7 +93,7 @@ export function SongToolbar({
             <ToolbarItem
               icon="logo-youtube"
               label="Ouvir"
-              accessibilityLabel="Ouvir a música no YouTube"
+              accessibilityLabel="Procurar a música no YouTube. Abre fora da aplicação."
               onPress={onPressListen}
             />
             <View style={styles.divider} />
