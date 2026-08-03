@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
-import { PianoShape } from '@/src/data/chord-shapes';
+import { PianoShape, PIANO_KEY_NAMES } from '@/src/data/chord-shapes';
 import { colors } from '@/src/theme/colors';
 
 interface Props {
@@ -10,133 +10,198 @@ interface Props {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Largura total do teclado = whiteW * BASE_WHITES, fixa por tamanho. Acordes que
+// precisem de mais teclas (baixos invertidos) alargam a contagem e estreitam a
+// tecla, para o cartão nunca mudar de largura no meio de uma lista.
+const BASE_WHITES = 10;
+
 const SIZES = {
-  sm: { whiteW: 13, height: 60, label: 12, octaves: 1, pad: 6 },
-  md: { whiteW: 17, height: 90, label: 16, octaves: 2, pad: 10 },
-  lg: { whiteW: 26, height: 130, label: 22, octaves: 2, pad: 14 },
+  sm: { whiteW: 11, height: 56, label: 12, pad: 6, notes: false },
+  md: { whiteW: 18, height: 88, label: 16, pad: 10, notes: true },
+  lg: { whiteW: 30, height: 128, label: 22, pad: 14, notes: true },
 };
 
+const NOTE_STRIP = 16;
 const WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
-const BLACK_OFFSETS: { pc: number; after: number }[] = [
-  { pc: 1, after: 0 },
-  { pc: 3, after: 1 },
-  { pc: 6, after: 3 },
-  { pc: 8, after: 4 },
-  { pc: 10, after: 5 },
-];
+
+const isWhite = (semi: number) => WHITE_PCS.includes(((semi % 12) + 12) % 12);
+const noteName = (semi: number) => PIANO_KEY_NAMES[((semi % 12) + 12) % 12];
+
+// Janela de teclado que cobre o acorde: começa na tecla branca imediatamente
+// abaixo da nota mais grave e sobe o suficiente para a nota mais aguda caber.
+export function windowFor(shape: PianoShape) {
+  const root = shape.rootPc;
+  const notes = shape.intervals.map((iv) => root + iv);
+
+  let bass: number | null = null;
+  if (shape.bassPc != null) {
+    bass = shape.bassPc;
+    while (bass >= root) bass -= 12; // o baixo da barra soa abaixo da tónica
+  }
+
+  const lowest = bass ?? root;
+  let start = lowest;
+  while (!isWhite(start)) start--;
+
+  // Uma tecla preta desenha-se entre duas brancas, por isso se a nota mais
+  // aguda for preta ainda precisamos da branca acima dela.
+  let end = Math.max(...notes);
+  if (!isWhite(end)) end++;
+
+  let needed = 0;
+  for (let s = start; s <= end; s++) if (isWhite(s)) needed++;
+
+  const highlighted = new Set<number>(notes);
+  if (bass != null) highlighted.add(bass);
+
+  return { start, whiteCount: Math.max(BASE_WHITES, needed), highlighted, root, bass };
+}
 
 export function PianoDiagram({ chord, shape, size = 'md' }: Props) {
   const c = SIZES[size];
-  const whiteCount = 7 * c.octaves;
-  const keyboardW = whiteCount * c.whiteW;
+  const totalW = BASE_WHITES * c.whiteW;
   const keyboardH = c.height;
-  const blackW = c.whiteW * 0.6;
-  const blackH = keyboardH * 0.62;
+  const showNotes = c.notes;
+  const svgH = keyboardH + (showNotes ? NOTE_STRIP : 0);
 
-  const highlighted = new Set<number>();
-  if (shape) {
-    shape.intervals.forEach((iv) =>
-      highlighted.add(((shape.rootPc + iv) % 12 + 12) % 12),
+  if (!shape) {
+    return (
+      <View style={[styles.card, { width: totalW + c.pad * 2 }]}>
+        <Text style={[styles.title, { fontSize: c.label }]} numberOfLines={1}>
+          {chord || ' '}
+        </Text>
+        <View style={[styles.fallback, { width: totalW, height: keyboardH }]}>
+          <Text style={styles.fallbackText}>—</Text>
+        </View>
+      </View>
     );
   }
 
-  const whiteKeys: { pc: number; oct: number; x: number }[] = [];
-  for (let oct = 0; oct < c.octaves; oct++) {
-    WHITE_PCS.forEach((pc, i) => {
-      whiteKeys.push({ pc, oct, x: (oct * 7 + i) * c.whiteW });
-    });
+  const { start, whiteCount, highlighted, root, bass } = windowFor(shape);
+  const whiteW = totalW / whiteCount;
+  const blackW = whiteW * 0.62;
+  const blackH = keyboardH * 0.62;
+
+  // Teclas brancas da janela, da esquerda para a direita.
+  const whites: { semi: number; x: number }[] = [];
+  for (let s = start; whites.length < whiteCount; s++) {
+    if (isWhite(s)) whites.push({ semi: s, x: whites.length * whiteW });
   }
 
+  // Cada preta encosta ao limite direito da branca que a antecede. A última
+  // branca não conta: não há tecla seguinte onde encostar.
+  const blacks: { semi: number; cx: number }[] = [];
+  whites.forEach((w, i) => {
+    if (i < whites.length - 1 && !isWhite(w.semi + 1)) {
+      blacks.push({ semi: w.semi + 1, cx: (i + 1) * whiteW });
+    }
+  });
+
+  const labels = [...highlighted].sort((a, b) => a - b).map((semi) => {
+    const white = whites.find((w) => w.semi === semi);
+    const cx = white ? white.x + whiteW / 2 : blacks.find((b) => b.semi === semi)?.cx;
+    return cx == null ? null : { semi, cx };
+  });
+
   return (
-    <View style={[styles.card, { width: keyboardW + c.pad * 2 }]}>
+    <View style={[styles.card, { width: totalW + c.pad * 2 }]}>
       <Text style={[styles.title, { fontSize: c.label }]} numberOfLines={1}>
         {chord || ' '}
       </Text>
 
-      {!shape ? (
-        <View
-          style={[
-            styles.fallback,
-            { width: keyboardW + c.pad, height: keyboardH + c.pad },
-          ]}
-        >
-          <Text style={styles.fallbackText}>—</Text>
-        </View>
-      ) : (
-        <View style={styles.kbWrap}>
-          <Svg width={keyboardW} height={keyboardH}>
-            <Defs>
-              <LinearGradient id="white" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#FFFFFF" />
-                <Stop offset="0.85" stopColor="#F2F2F4" />
-                <Stop offset="1" stopColor="#D8D8DC" />
-              </LinearGradient>
-              <LinearGradient id="whiteActive" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#4FD8E4" />
-                <Stop offset="1" stopColor={colors.primary} />
-              </LinearGradient>
-              <LinearGradient id="whiteRoot" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={colors.primary} />
-                <Stop offset="1" stopColor={colors.primaryDim} />
-              </LinearGradient>
-              <LinearGradient id="black" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#3A3A40" />
-                <Stop offset="0.1" stopColor="#1A1A1F" />
-                <Stop offset="1" stopColor="#08080A" />
-              </LinearGradient>
-              <LinearGradient id="blackActive" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#2FC8D6" />
-                <Stop offset="1" stopColor={colors.primaryDim} />
-              </LinearGradient>
-              <LinearGradient id="blackRoot" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#4FD8E4" />
-                <Stop offset="1" stopColor={colors.primary} />
-              </LinearGradient>
-            </Defs>
+      <View style={styles.kbWrap}>
+        <Svg width={totalW} height={svgH}>
+          <Defs>
+            <LinearGradient id="white" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#FFFFFF" />
+              <Stop offset="0.85" stopColor="#F2F2F4" />
+              <Stop offset="1" stopColor="#D8D8DC" />
+            </LinearGradient>
+            <LinearGradient id="whiteActive" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#4FD8E4" />
+              <Stop offset="1" stopColor={colors.primary} />
+            </LinearGradient>
+            <LinearGradient id="whiteRoot" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.primary} />
+              <Stop offset="1" stopColor={colors.primaryDim} />
+            </LinearGradient>
+            <LinearGradient id="black" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#3A3A40" />
+              <Stop offset="0.1" stopColor="#1A1A1F" />
+              <Stop offset="1" stopColor="#08080A" />
+            </LinearGradient>
+            <LinearGradient id="blackActive" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#2FC8D6" />
+              <Stop offset="1" stopColor={colors.primaryDim} />
+            </LinearGradient>
+            <LinearGradient id="blackRoot" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#4FD8E4" />
+              <Stop offset="1" stopColor={colors.primary} />
+            </LinearGradient>
+          </Defs>
 
-            {/* White keys */}
-            {whiteKeys.map((wk, i) => {
-              const isRoot = wk.oct === 0 && wk.pc === shape.rootPc;
-              const active = wk.oct === 0 && highlighted.has(wk.pc);
-              const fill = isRoot ? 'url(#whiteRoot)' : active ? 'url(#whiteActive)' : 'url(#white)';
-              return (
-                <Rect
-                  key={`w${i}`}
-                  x={wk.x + 0.5}
-                  y={0}
-                  width={c.whiteW - 1}
-                  height={keyboardH}
-                  fill={fill}
-                  stroke="#1A1A1F"
-                  strokeWidth={0.6}
-                  rx={2}
-                />
-              );
-            })}
+          {whites.map((w) => {
+            const fill =
+              w.semi === root
+                ? 'url(#whiteRoot)'
+                : highlighted.has(w.semi)
+                  ? 'url(#whiteActive)'
+                  : 'url(#white)';
+            return (
+              <Rect
+                key={`w${w.semi}`}
+                x={w.x + 0.5}
+                y={0}
+                width={whiteW - 1}
+                height={keyboardH}
+                fill={fill}
+                stroke="#1A1A1F"
+                strokeWidth={0.6}
+                rx={2}
+              />
+            );
+          })}
 
-            {/* Black keys (rendered after whites so they overlay) */}
-            {Array.from({ length: c.octaves }).flatMap((_, oct) =>
-              BLACK_OFFSETS.map((b) => {
-                const isRoot = oct === 0 && b.pc === shape.rootPc;
-                const active = oct === 0 && highlighted.has(b.pc);
-                const xCenter = (oct * 7 + b.after + 1) * c.whiteW;
-                const fill = isRoot ? 'url(#blackRoot)' : active ? 'url(#blackActive)' : 'url(#black)';
-                return (
-                  <Rect
-                    key={`b${oct}-${b.pc}`}
-                    x={xCenter - blackW / 2}
-                    y={0}
-                    width={blackW}
-                    height={blackH}
-                    fill={fill}
-                    rx={2}
-                  />
-                );
-              }),
+          {/* Pretas depois das brancas para ficarem por cima */}
+          {blacks.map((b) => {
+            const fill =
+              b.semi === root
+                ? 'url(#blackRoot)'
+                : highlighted.has(b.semi)
+                  ? 'url(#blackActive)'
+                  : 'url(#black)';
+            return (
+              <Rect
+                key={`b${b.semi}`}
+                x={b.cx - blackW / 2}
+                y={0}
+                width={blackW}
+                height={blackH}
+                fill={fill}
+                rx={2}
+              />
+            );
+          })}
+
+          {showNotes &&
+            labels.map((l) =>
+              l == null ? null : (
+                <SvgText
+                  key={`l${l.semi}`}
+                  x={l.cx}
+                  y={keyboardH + NOTE_STRIP - 4}
+                  fontSize={Math.min(11, whiteW * 0.62)}
+                  fontWeight={l.semi === root ? '800' : '600'}
+                  fill={l.semi === root ? colors.primary : colors.textMuted}
+                  textAnchor="middle"
+                >
+                  {noteName(l.semi)}
+                  {l.semi === bass ? '↓' : ''}
+                </SvgText>
+              ),
             )}
-          </Svg>
-        </View>
-      )}
+        </Svg>
+      </View>
     </View>
   );
 }
