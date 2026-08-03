@@ -57,7 +57,7 @@ assets/database.json    Os 538 hinos
 assets/Logos Separata/  Fontes vetoriais da logo oficial
 ```
 
-### Ícones
+### Ícones e splash
 
 Os ícones em `assets/images/` são gerados a partir de
 `assets/Logos Separata/Logo Claro.svg`. Se a logo mudar:
@@ -70,6 +70,14 @@ node scripts/generate-icons.js
 A variante **Claro** (`#E5EEFC`) é a usada na app, porque a interface é toda
 escura; a variante **Escuro** (`#0E1E2F`) fica reservada para materiais sobre
 fundo claro.
+
+O arranque tem dois tempos. O splash **nativo** mostra só a marca
+(`splash-icon.png`), porque no Android 12+ a imagem é recortada num círculo e
+uma logo horizontal ficaria cortada. Assim que a app renderiza, o
+`AnimatedSplash` pega nessa marca, encolhe-a até ao sítio dela dentro da logo
+completa (`splash-logo.png`, com o nome) e só depois dissolve na app. As
+proporções em `AnimatedSplash.tsx` são medidas nos próprios PNG — se a logo
+mudar de enquadramento, é preciso reavaliá-las.
 
 ### Notas de arquitectura
 

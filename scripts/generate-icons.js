@@ -19,6 +19,10 @@ const sharp = require('sharp');
 
 const ROOT = path.join(__dirname, '..');
 const SRC_SVG = path.join(ROOT, 'assets/Logos Separata/Logo Claro.svg');
+// A logo completa (marca + "SEPARATA JA") já vem exportada na cor certa e com
+// fundo transparente, por isso é copiada tal e qual — o SVG dela traz as fontes
+// embutidas como glifos e não sobrevive bem à rasterização.
+const SRC_FULL_PNG = path.join(ROOT, 'assets/Logos Separata/Completo Claro.png');
 const OUT = path.join(ROOT, 'assets/images');
 
 const BG = '#0E1E2F'; // colors.background
@@ -107,6 +111,10 @@ async function compose({ size, logoHeightRatio, hex, background, out, opaque }) 
     hex: LIGHT,
     out: 'splash-icon.png',
   });
+
+  // Splash a sério — a logo completa, com o nome. É esta que o app.json usa.
+  fs.copyFileSync(SRC_FULL_PNG, path.join(OUT, 'splash-logo.png'));
+  console.log(`  ${'splash-logo.png'.padEnd(32)} (cópia de "Completo Claro.png")`);
 
   await compose({
     size: 48,
