@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createStorageSlot } from '@/src/utils/storage';
 
-const STORAGE_KEY = '@psalterio:fontSize';
+const STORAGE_KEY = '@separata:fontSize';
 const DEFAULT_FONT_SIZE = 19;
 const MIN_FONT = 12;
 const MAX_FONT = 28;

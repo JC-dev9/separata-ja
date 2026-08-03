@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { createStorageSlot } from '@/src/utils/storage';
 
-const STORAGE_KEY = '@psalterio:song-overrides';
+const STORAGE_KEY = '@separata:song-overrides';
 
 const slot = createStorageSlot(STORAGE_KEY);
 

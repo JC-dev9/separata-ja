@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createStorageSlot } from '@/src/utils/storage';
 
-const STORAGE_KEY = '@psalterio:chordDictionaryCollapsed';
+const STORAGE_KEY = '@separata:chordDictionaryCollapsed';
 
 const slot = createStorageSlot(STORAGE_KEY);
 

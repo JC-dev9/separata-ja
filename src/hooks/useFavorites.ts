@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createStorageSlot } from '@/src/utils/storage';
 
-const STORAGE_KEY = '@psalterio:favorites';
+const STORAGE_KEY = '@separata:favorites';
 
 const slot = createStorageSlot(STORAGE_KEY);
 

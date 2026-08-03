@@ -26,7 +26,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Músicas',
-          headerTitle: 'Saltério',
+          headerTitle: 'Separata JA',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="musical-notes" size={size} color={color} />
           ),

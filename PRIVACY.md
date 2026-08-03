@@ -1,9 +1,9 @@
-# Política de Privacidade — Saltério
+# Política de Privacidade — Separata JA
 
 **Última actualização:** 29 de Julho de 2026
 
-Esta política descreve como a aplicação **Saltério** trata a informação dos seus
-utilizadores.
+Esta política descreve como a aplicação **Separata JA** trata a informação dos
+seus utilizadores.
 
 > ⚠️ **Rascunho.** Antes de publicar, substitui os campos marcados `[...]` e revê
 > o texto. Não é aconselhamento jurídico — se tiveres dúvidas, confirma com um
@@ -13,8 +13,8 @@ utilizadores.
 
 ## Resumo
 
-O Saltério **não recolhe, não armazena e não transmite dados pessoais**. Não há
-contas de utilizador, não há registo, não há servidores nossos a receber
+A Separata JA **não recolhe, não armazena e não transmite dados pessoais**. Não
+há contas de utilizador, não há registo, não há servidores nossos a receber
 informação tua. Tudo o que a aplicação guarda fica no teu dispositivo.
 
 ---
@@ -58,7 +58,7 @@ instrumentos**.
 ## Ligações a serviços externos
 
 Ao usares a função **"Ouvir"**, a aplicação abre uma pesquisa no YouTube **fora
-da aplicação** — no teu browser ou na aplicação do YouTube. O Saltério não
+da aplicação** — no teu browser ou na aplicação do YouTube. A Separata JA não
 embute o YouTube no seu interior, por isso nunca tem acesso à tua sessão nem
 aos teus dados de navegação. A partir desse momento aplicam-se os termos e a
 política de privacidade do YouTube/Google, sobre os quais não temos controlo:

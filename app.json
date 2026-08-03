@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Saltério",
-    "slug": "psalterio-rn",
+    "name": "Separata JA",
+    "slug": "separata-ja",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "psalteriorn",
+    "scheme": "separataja",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "runtimeVersion": {
@@ -17,7 +17,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.juanloza.psalterio.corroios"
+      "bundleIdentifier": "com.juanloza.separataja"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +32,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "com.juanloza.psalterio.corroios"
+      "package": "com.juanloza.separataja"
     },
     "web": {
       "output": "static",

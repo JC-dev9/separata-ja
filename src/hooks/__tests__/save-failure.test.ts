@@ -8,7 +8,7 @@ type Store = typeof import('../useSongOverride');
 const getItem = AsyncStorage.getItem as jest.Mock;
 const setItem = AsyncStorage.setItem as jest.Mock;
 
-const KEY = '@psalterio:song-overrides';
+const KEY = '@separata:song-overrides';
 
 /** Importa o store já hidratado, opcionalmente com a leitura inicial a falhar. */
 async function carregarStore({ leituraFalha = false } = {}): Promise<Store> {

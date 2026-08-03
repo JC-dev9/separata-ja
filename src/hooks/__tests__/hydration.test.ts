@@ -45,20 +45,20 @@ describe('hidratação com leitura falhada', () => {
   });
 
   it('favoritos: uma leitura falhada não deixa os dados no disco em risco', async () => {
-    await AsyncStorage.setItem('@psalterio:favorites', JSON.stringify([7, 42]));
+    await AsyncStorage.setItem('@separata:favorites', JSON.stringify([7, 42]));
 
     const mod = importarComLeituraFalhada<typeof import('../useFavorites')>('../useFavorites');
     await mod.hydrateFavorites();
 
     // A app arranca sem favoritos visíveis — mau, mas temporário. O que não
     // pode acontecer é a próxima gravação levar os do disco à frente.
-    expect(await AsyncStorage.getItem('@psalterio:favorites')).toBe(JSON.stringify([7, 42]));
+    expect(await AsyncStorage.getItem('@separata:favorites')).toBe(JSON.stringify([7, 42]));
   });
 });
 
 describe('hidratação normal', () => {
   it('favoritos: lê o que está no disco', async () => {
-    await AsyncStorage.setItem('@psalterio:favorites', JSON.stringify([1, 2]));
+    await AsyncStorage.setItem('@separata:favorites', JSON.stringify([1, 2]));
 
     let mod!: typeof import('../useFavorites');
     jest.isolateModules(() => {
@@ -66,11 +66,11 @@ describe('hidratação normal', () => {
     });
     await mod.hydrateFavorites();
 
-    expect(getItem).toHaveBeenCalledWith('@psalterio:favorites');
+    expect(getItem).toHaveBeenCalledWith('@separata:favorites');
   });
 
   it('edições: dados corrompidos são recuperáveis, ao contrário de I/O falhado', async () => {
-    await AsyncStorage.setItem('@psalterio:song-overrides', '{isto não é json');
+    await AsyncStorage.setItem('@separata:song-overrides', '{isto não é json');
 
     let mod!: typeof import('../useSongOverride');
     jest.isolateModules(() => {

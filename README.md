@@ -1,4 +1,4 @@
-# Saltério
+# Separata JA
 
 Hinário digital com cifras, transposição de tons, dicionário de acordes
 (violão e teclado), rolagem automática e afinador de instrumentos.
