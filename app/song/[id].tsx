@@ -38,6 +38,10 @@ import {
 // Auto-scroll: speed range tuned so 0 ≈ 0.05 px/frame, 1 ≈ 0.8 px/frame.
 const MIN_PX_PER_FRAME = 0.05;
 const MAX_PX_PER_FRAME = 0.8;
+// Silêncio de eventos de scroll a partir do qual damos a inércia por terminada
+// e retomamos a rolagem automática (rede de segurança para as plataformas que
+// não disparam onMomentumScrollEnd quando não houve inércia nenhuma).
+const RESUME_AFTER_TOUCH_MS = 150;
 
 export default function SongScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -93,6 +97,11 @@ export default function SongScreen() {
   const rafRef = useRef<number | null>(null);
   const speedRef = useRef(scrollSpeed);
   const autoScrollOpenRef = useRef(autoScrollOpen);
+  // Dedo em baixo: o utilizador manda na rolagem.
+  const draggingRef = useRef(false);
+  // Instante do último evento de scroll ainda causado pelo gesto (inércia);
+  // 0 quando não há gesto a decorrer.
+  const userScrollAt = useRef(0);
 
   // Pill hide/show animation
   const pillTranslateY = useSharedValue(0);
@@ -117,11 +126,19 @@ export default function SongScreen() {
       return;
     }
     const tick = () => {
+      rafRef.current = requestAnimationFrame(tick);
+      // Enquanto o dedo está em baixo, ou a inércia do gesto ainda corre, não
+      // mexemos no scroll: o utilizador rola à vontade e a automática retoma
+      // sozinha a partir de onde ele parou (offset é reposto em onScroll).
+      if (draggingRef.current) return;
+      if (userScrollAt.current) {
+        if (Date.now() - userScrollAt.current < RESUME_AFTER_TOUCH_MS) return;
+        userScrollAt.current = 0;
+      }
       const px =
         MIN_PX_PER_FRAME + (MAX_PX_PER_FRAME - MIN_PX_PER_FRAME) * speedRef.current;
       offset.current += px;
       scrollRef.current?.scrollTo({ y: offset.current, animated: false });
-      rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => {
@@ -161,6 +178,9 @@ export default function SongScreen() {
     lastScrollY.current = y;
     offset.current = y;
 
+    // Mantém a automática em pausa enquanto os eventos ainda vêm do gesto.
+    if (draggingRef.current || userScrollAt.current) userScrollAt.current = Date.now();
+
     // Com a rolagem automática aberta a pill fica escondida de propósito: os
     // eventos de scroll (incluindo os que ela própria gera) não a podem repor.
     if (autoScrollOpenRef.current) return;
@@ -173,6 +193,21 @@ export default function SongScreen() {
       pillTranslateY.value = withTiming(0, { duration: 200 });
     }
   }, [pillTranslateY]);
+
+  const onScrollBeginDrag = useCallback(() => {
+    draggingRef.current = true;
+    userScrollAt.current = Date.now();
+  }, []);
+
+  const onScrollEndDrag = useCallback(() => {
+    draggingRef.current = false;
+    // Fica a contar: a inércia do gesto ainda pode estar a correr.
+    userScrollAt.current = Date.now();
+  }, []);
+
+  const onMomentumScrollEnd = useCallback(() => {
+    userScrollAt.current = 0;
+  }, []);
 
   const onChangeFont = useCallback((delta: number) => {
     changeFont(delta);
@@ -495,7 +530,10 @@ export default function SongScreen() {
         ref={scrollRef}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
-        scrollEventThrottle={32}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        scrollEventThrottle={16}
         stickyHeaderIndices={[0]}
         removeClippedSubviews
       >
