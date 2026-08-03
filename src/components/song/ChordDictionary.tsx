@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { GuitarDiagram } from '@/src/components/song/diagrams/GuitarDiagram';
 import { PianoDiagram } from '@/src/components/song/diagrams/PianoDiagram';
@@ -19,16 +20,11 @@ interface Props {
 export function ChordDictionary({ chords, instrument, onChangeInstrument, onPressChord }: Props) {
   const { collapsed, toggle } = useChordDictionaryCollapsed();
 
-  function handleToggle() {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    toggle();
-  }
-
   return (
-    <View style={styles.wrap}>
+    <Animated.View style={styles.wrap} layout={LinearTransition.duration(200)}>
       <View style={styles.headerRow}>
         <Pressable
-          onPress={handleToggle}
+          onPress={toggle}
           accessibilityRole="button"
           accessibilityLabel={
             collapsed
@@ -68,29 +64,31 @@ export function ChordDictionary({ chords, instrument, onChangeInstrument, onPres
       </View>
 
       {!collapsed && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
-        >
-          {chords.map((chord) => (
-            <Pressable
-              key={chord}
-              onPress={() => onPressChord(chord)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver o acorde ${chord}`}
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
-            >
-              {instrument === 'guitar' ? (
-                <GuitarDiagram chord={chord} shape={getGuitarShape(chord)} size="sm" />
-              ) : (
-                <PianoDiagram chord={chord} shape={getPianoShape(chord)} size="sm" />
-              )}
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+          >
+            {chords.map((chord) => (
+              <Pressable
+                key={chord}
+                onPress={() => onPressChord(chord)}
+                accessibilityRole="button"
+                accessibilityLabel={`Ver o acorde ${chord}`}
+                style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+              >
+                {instrument === 'guitar' ? (
+                  <GuitarDiagram chord={chord} shape={getGuitarShape(chord)} size="sm" />
+                ) : (
+                  <PianoDiagram chord={chord} shape={getPianoShape(chord)} size="sm" />
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
