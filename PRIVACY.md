@@ -57,9 +57,11 @@ instrumentos**.
 
 ## Ligações a serviços externos
 
-Ao usares a função **"Ouvir"**, a aplicação abre uma pesquisa no YouTube. A
-partir desse momento aplicam-se os termos e a política de privacidade do
-YouTube/Google, sobre os quais não temos controlo:
+Ao usares a função **"Ouvir"**, a aplicação abre uma pesquisa no YouTube **fora
+da aplicação** — no teu browser ou na aplicação do YouTube. O Saltério não
+embute o YouTube no seu interior, por isso nunca tem acesso à tua sessão nem
+aos teus dados de navegação. A partir desse momento aplicam-se os termos e a
+política de privacidade do YouTube/Google, sobre os quais não temos controlo:
 
 - <https://policies.google.com/privacy>
 

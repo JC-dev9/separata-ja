@@ -85,6 +85,11 @@ fundo claro.
   `createStorageSlot` suspende as escritas dessa chave até ao arranque seguinte
   (com uma re-tentativa, que só desbloqueia se o disco estiver mesmo vazio).
   Ver `src/utils/storage.ts`.
+- **O YouTube abre fora da app.** A acção "Ouvir" faz `Linking.openURL` para a
+  pesquisa (`src/utils/youtube.ts`). Já esteve embutido num WebView, o que
+  obrigava a forjar o user-agent para contornar o bloqueio do YouTube a
+  browsers embebidos: quebrava sempre que eles mudavam a detecção e arriscava a
+  revisão nas lojas. O único WebView que resta é o do afinador.
 - **Gravações falhadas são visíveis onde importam.** Uma edição que não chega ao
   disco levanta um aviso no ecrã da música (`saveFailed` em `useSongOverride`).
   Nos favoritos e no tamanho da letra não se avisa — refaz-se com um toque.
@@ -143,5 +148,3 @@ eas update --branch production --message "corrige X"
       `assets/database.json`.
 - [ ] Testar o afinador em dispositivos Android de fabricantes diferentes — a
       captura de áudio corre num WebView e o comportamento varia.
-- [ ] Rever o `ListenSheet`: carrega o YouTube num WebView com user-agent
-      forjado, o que pode quebrar sem aviso e é mal visto na revisão das lojas.
