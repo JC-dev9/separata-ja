@@ -92,6 +92,7 @@ export default function SongScreen() {
   const lastScrollY = useRef(0);
   const rafRef = useRef<number | null>(null);
   const speedRef = useRef(scrollSpeed);
+  const autoScrollOpenRef = useRef(autoScrollOpen);
 
   // Pill hide/show animation
   const pillTranslateY = useSharedValue(0);
@@ -99,6 +100,15 @@ export default function SongScreen() {
     transform: [{ translateY: pillTranslateY.value }],
   }));
   speedRef.current = scrollSpeed;
+  autoScrollOpenRef.current = autoScrollOpen;
+
+  // A barra de velocidade ocupa o lugar da pill, por isso são sempre uma ou a
+  // outra. Ficar aqui garante que fecha pelo X também repõe a pill.
+  useEffect(() => {
+    pillTranslateY.value = withTiming(autoScrollOpen ? TOOLBAR_PILL_HEIGHT + 80 : 0, {
+      duration: 250,
+    });
+  }, [autoScrollOpen, pillTranslateY]);
 
   useEffect(() => {
     if (!autoScrollPlaying) {
@@ -151,6 +161,10 @@ export default function SongScreen() {
     lastScrollY.current = y;
     offset.current = y;
 
+    // Com a rolagem automática aberta a pill fica escondida de propósito: os
+    // eventos de scroll (incluindo os que ela própria gera) não a podem repor.
+    if (autoScrollOpenRef.current) return;
+
     if (y < 10) {
       pillTranslateY.value = withTiming(0, { duration: 200 });
     } else if (dy > 8) {
@@ -178,14 +192,10 @@ export default function SongScreen() {
   }, [song]);
   const onPressFont = useCallback(() => fontSheetRef.current?.present(), []);
   const onPressAutoScroll = useCallback(() => {
-    setAutoScrollOpen((v) => {
-      const next = !v;
-      pillTranslateY.value = withTiming(next ? TOOLBAR_PILL_HEIGHT + 80 : 0, { duration: 250 });
-      if (next) setAutoScrollPlaying(true);
-      else setAutoScrollPlaying(false);
-      return next;
-    });
-  }, [pillTranslateY]);
+    const next = !autoScrollOpenRef.current;
+    setAutoScrollOpen(next);
+    setAutoScrollPlaying(next);
+  }, []);
   const onTogglePlay = useCallback(() => setAutoScrollPlaying((v) => !v), []);
   const onCloseAutoScroll = useCallback(() => {
     setAutoScrollPlaying(false);
