@@ -2,8 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  LinearTransition,
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useFrameCallback,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChordLine } from '@/src/components/ChordLine';
@@ -42,6 +51,7 @@ const MAX_PX_PER_FRAME = 0.8;
 // e retomamos a rolagem automática (rede de segurança para as plataformas que
 // não disparam onMomentumScrollEnd quando não houve inércia nenhuma).
 const RESUME_AFTER_TOUCH_MS = 150;
+const DEFAULT_SCROLL_SPEED = 0.3;
 
 export default function SongScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -56,6 +66,14 @@ export default function SongScreen() {
   const { override, setOverride, clearOverride, hasOverride, isStale, saveFailed } =
     useSongOverride(song?.id, song?.content);
   const effectiveContent = override ?? song?.content ?? '';
+  // Os handlers de edição (onDeleteChord, onSelectMoveSource, ...) precisam do
+  // conteúdo mais recente, mas não podem depender dele diretamente: isso mudaria
+  // a identidade do callback a cada edição e invalidaria o memo() de TODAS as
+  // ChordLine, não só da linha editada.
+  const effectiveContentRef = useRef(effectiveContent);
+  useEffect(() => {
+    effectiveContentRef.current = effectiveContent;
+  }, [effectiveContent]);
 
   // Pre-split content + base chord set.
   const lines = useMemo(() => effectiveContent.split('\n'), [effectiveContent]);
@@ -89,27 +107,30 @@ export default function SongScreen() {
   // Auto-scroll
   const [autoScrollOpen, setAutoScrollOpen] = useState(false);
   const [autoScrollPlaying, setAutoScrollPlaying] = useState(false);
-  const [scrollSpeed, setScrollSpeed] = useState(0.3);
 
-  const scrollRef = useRef<ScrollView>(null);
-  const offset = useRef(0);
-  const lastScrollY = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const speedRef = useRef(scrollSpeed);
-  const autoScrollOpenRef = useRef(autoScrollOpen);
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  // Estado lido dentro de worklets (tick da rolagem automática e onScroll) —
+  // têm de ser shared values, não refs: um ref normal de JS não é seguro de
+  // ler/escrever na UI thread.
+  const offsetSV = useSharedValue(0);
+  const lastScrollYSV = useSharedValue(0);
+  const speedSV = useSharedValue(DEFAULT_SCROLL_SPEED);
+  const autoScrollOpenSV = useSharedValue(false);
   // Dedo em baixo: o utilizador manda na rolagem.
-  const draggingRef = useRef(false);
+  const draggingSV = useSharedValue(false);
   // Instante do último evento de scroll ainda causado pelo gesto (inércia);
   // 0 quando não há gesto a decorrer.
-  const userScrollAt = useRef(0);
+  const userScrollAtSV = useSharedValue(0);
 
   // Pill hide/show animation
   const pillTranslateY = useSharedValue(0);
   const pillAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: pillTranslateY.value }],
   }));
-  speedRef.current = scrollSpeed;
-  autoScrollOpenRef.current = autoScrollOpen;
+
+  useEffect(() => {
+    autoScrollOpenSV.value = autoScrollOpen;
+  }, [autoScrollOpen, autoScrollOpenSV]);
 
   // A barra de velocidade ocupa o lugar da pill, por isso são sempre uma ou a
   // outra. Ficar aqui garante que fecha pelo X também repõe a pill.
@@ -119,32 +140,26 @@ export default function SongScreen() {
     });
   }, [autoScrollOpen, pillTranslateY]);
 
-  useEffect(() => {
-    if (!autoScrollPlaying) {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-      return;
+  // Corre inteiramente na UI thread: nenhum toque em botão fica em fila atrás
+  // disto enquanto a rolagem automática está ativa.
+  const scrollTick = useFrameCallback(() => {
+    'worklet';
+    // Enquanto o dedo está em baixo, ou a inércia do gesto ainda corre, não
+    // mexemos no scroll: o utilizador rola à vontade e a automática retoma
+    // sozinha a partir de onde ele parou (offset é reposto em onScroll).
+    if (draggingSV.value) return;
+    if (userScrollAtSV.value) {
+      if (Date.now() - userScrollAtSV.value < RESUME_AFTER_TOUCH_MS) return;
+      userScrollAtSV.value = 0;
     }
-    const tick = () => {
-      rafRef.current = requestAnimationFrame(tick);
-      // Enquanto o dedo está em baixo, ou a inércia do gesto ainda corre, não
-      // mexemos no scroll: o utilizador rola à vontade e a automática retoma
-      // sozinha a partir de onde ele parou (offset é reposto em onScroll).
-      if (draggingRef.current) return;
-      if (userScrollAt.current) {
-        if (Date.now() - userScrollAt.current < RESUME_AFTER_TOUCH_MS) return;
-        userScrollAt.current = 0;
-      }
-      const px =
-        MIN_PX_PER_FRAME + (MAX_PX_PER_FRAME - MIN_PX_PER_FRAME) * speedRef.current;
-      offset.current += px;
-      scrollRef.current?.scrollTo({ y: offset.current, animated: false });
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [autoScrollPlaying]);
+    const px = MIN_PX_PER_FRAME + (MAX_PX_PER_FRAME - MIN_PX_PER_FRAME) * speedSV.value;
+    offsetSV.value += px;
+    scrollTo(scrollRef, 0, offsetSV.value, false);
+  }, false);
+
+  useEffect(() => {
+    scrollTick.setActive(autoScrollPlaying);
+  }, [autoScrollPlaying, scrollTick]);
 
   // Sheets
   const keySheetRef = useRef<KeySheetHandle>(null);
@@ -172,42 +187,53 @@ export default function SongScreen() {
     [currentKey],
   );
 
-  const onScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const dy = y - lastScrollY.current;
-    lastScrollY.current = y;
-    offset.current = y;
+  // Corre inteiramente na UI thread: esconder/mostrar a pill deixou de
+  // depender de round-trips para a JS thread a cada evento de scroll.
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      const y = e.contentOffset.y;
+      const dy = y - lastScrollYSV.value;
+      lastScrollYSV.value = y;
+      offsetSV.value = y;
 
-    // Mantém a automática em pausa enquanto os eventos ainda vêm do gesto.
-    if (draggingRef.current || userScrollAt.current) userScrollAt.current = Date.now();
+      // Mantém a automática em pausa enquanto os eventos ainda vêm do gesto.
+      if (draggingSV.value || userScrollAtSV.value) userScrollAtSV.value = Date.now();
 
-    // Com a rolagem automática aberta a pill fica escondida de propósito: os
-    // eventos de scroll (incluindo os que ela própria gera) não a podem repor.
-    if (autoScrollOpenRef.current) return;
+      // Com a rolagem automática aberta a pill fica escondida de propósito: os
+      // eventos de scroll (incluindo os que ela própria gera) não a podem repor.
+      if (autoScrollOpenSV.value) return;
 
-    if (y < 10) {
-      pillTranslateY.value = withTiming(0, { duration: 200 });
-    } else if (dy > 8) {
-      pillTranslateY.value = withTiming(TOOLBAR_PILL_HEIGHT + 80, { duration: 200 });
-    } else if (dy < -8) {
-      pillTranslateY.value = withTiming(0, { duration: 200 });
-    }
-  }, [pillTranslateY]);
+      if (y < 10) {
+        if (pillTranslateY.value !== 0) pillTranslateY.value = withTiming(0, { duration: 200 });
+      } else if (dy > 8) {
+        const target = TOOLBAR_PILL_HEIGHT + 80;
+        if (pillTranslateY.value !== target) {
+          pillTranslateY.value = withTiming(target, { duration: 200 });
+        }
+      } else if (dy < -8) {
+        if (pillTranslateY.value !== 0) pillTranslateY.value = withTiming(0, { duration: 200 });
+      }
+    },
+    onBeginDrag: () => {
+      draggingSV.value = true;
+      userScrollAtSV.value = Date.now();
+    },
+    onEndDrag: () => {
+      draggingSV.value = false;
+      // Fica a contar: a inércia do gesto ainda pode estar a correr.
+      userScrollAtSV.value = Date.now();
+    },
+    onMomentumEnd: () => {
+      userScrollAtSV.value = 0;
+    },
+  });
 
-  const onScrollBeginDrag = useCallback(() => {
-    draggingRef.current = true;
-    userScrollAt.current = Date.now();
-  }, []);
-
-  const onScrollEndDrag = useCallback(() => {
-    draggingRef.current = false;
-    // Fica a contar: a inércia do gesto ainda pode estar a correr.
-    userScrollAt.current = Date.now();
-  }, []);
-
-  const onMomentumScrollEnd = useCallback(() => {
-    userScrollAt.current = 0;
-  }, []);
+  const onSpeedChange = useCallback(
+    (v: number) => {
+      speedSV.value = v;
+    },
+    [speedSV],
+  );
 
   const onChangeFont = useCallback((delta: number) => {
     changeFont(delta);
@@ -227,10 +253,10 @@ export default function SongScreen() {
   }, [song]);
   const onPressFont = useCallback(() => fontSheetRef.current?.present(), []);
   const onPressAutoScroll = useCallback(() => {
-    const next = !autoScrollOpenRef.current;
+    const next = !autoScrollOpenSV.value;
     setAutoScrollOpen(next);
     setAutoScrollPlaying(next);
-  }, []);
+  }, [autoScrollOpenSV]);
   const onTogglePlay = useCallback(() => setAutoScrollPlaying((v) => !v), []);
   const onCloseAutoScroll = useCallback(() => {
     setAutoScrollPlaying(false);
@@ -247,16 +273,16 @@ export default function SongScreen() {
 
   const onDeleteChord = useCallback(
     (lineIdx: number, segIdx: number) => {
-      const linesNow = effectiveContent.split('\n');
+      const linesNow = effectiveContentRef.current.split('\n');
       const target = linesNow[lineIdx];
       if (target == null) return;
       const segs = parseLine(target);
       const next = deleteChordAt(segs, segIdx);
       linesNow[lineIdx] = serializeLine(next);
-      setUndoSnapshot(effectiveContent);
+      setUndoSnapshot(effectiveContentRef.current);
       setOverride(linesNow.join('\n'));
     },
-    [effectiveContent, setOverride],
+    [setOverride],
   );
 
   const onInsertChord = useCallback(
@@ -267,18 +293,15 @@ export default function SongScreen() {
     [],
   );
 
-  const onSelectMoveSource = useCallback(
-    (lineIdx: number, segIdx: number) => {
-      const linesNow = effectiveContent.split('\n');
-      const target = linesNow[lineIdx];
-      if (target == null) return;
-      const segs = parseLine(target);
-      const chord = segs[segIdx]?.chord;
-      if (!chord) return;
-      setMovingChord({ lineIdx, segIdx, chord });
-    },
-    [effectiveContent],
-  );
+  const onSelectMoveSource = useCallback((lineIdx: number, segIdx: number) => {
+    const linesNow = effectiveContentRef.current.split('\n');
+    const target = linesNow[lineIdx];
+    if (target == null) return;
+    const segs = parseLine(target);
+    const chord = segs[segIdx]?.chord;
+    if (!chord) return;
+    setMovingChord({ lineIdx, segIdx, chord });
+  }, []);
 
   const onCancelMove = useCallback(() => {
     if (movingChord) {
@@ -307,7 +330,7 @@ export default function SongScreen() {
     (toLineIdx: number, toSegIdx: number, charOffset: number) => {
       const from = movingChord;
       if (!from) return;
-      const linesNow = effectiveContent.split('\n');
+      const linesNow = effectiveContentRef.current.split('\n');
 
       if (from.lineIdx === toLineIdx) {
         const segs = parseLine(linesNow[from.lineIdx]);
@@ -327,11 +350,11 @@ export default function SongScreen() {
         );
       }
 
-      setUndoSnapshot(effectiveContent);
+      setUndoSnapshot(effectiveContentRef.current);
       setOverride(linesNow.join('\n'));
       setMovingChord(null);
     },
-    [movingChord, effectiveContent, setOverride],
+    [movingChord, setOverride],
   );
 
   // O acorde a mostrar no banner é a versão transposta para a tonalidade actual.
@@ -345,7 +368,7 @@ export default function SongScreen() {
       const pending = pendingInsert.current;
       pendingInsert.current = null;
       if (!pending) return;
-      const linesNow = effectiveContent.split('\n');
+      const linesNow = effectiveContentRef.current.split('\n');
       const target = linesNow[pending.lineIdx];
       if (target == null) return;
       const segs = parseLine(target);
@@ -359,10 +382,10 @@ export default function SongScreen() {
       );
       const next = insertChordAt(segs, pending.segIdx, pending.charOffset, inOriginalKey);
       linesNow[pending.lineIdx] = serializeLine(next);
-      setUndoSnapshot(effectiveContent);
+      setUndoSnapshot(effectiveContentRef.current);
       setOverride(linesNow.join('\n'));
     },
-    [effectiveContent, originalKey, transposeSemitones, setOverride],
+    [originalKey, transposeSemitones, setOverride],
   );
 
   const onUndoDelete = useCallback(() => {
@@ -526,13 +549,10 @@ export default function SongScreen() {
         </View>
       ) : null}
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
-        onScrollBeginDrag={onScrollBeginDrag}
-        onScrollEndDrag={onScrollEndDrag}
-        onMomentumScrollEnd={onMomentumScrollEnd}
         scrollEventThrottle={16}
         stickyHeaderIndices={[0]}
         removeClippedSubviews
@@ -544,7 +564,7 @@ export default function SongScreen() {
           onPressChord={onChordPress}
         />
 
-        <View style={styles.lyricsWrap}>
+        <Animated.View layout={LinearTransition.duration(200)} style={styles.lyricsWrap}>
           {song.credits ? <Text style={styles.credits}>{song.credits}</Text> : null}
           {lines.map((line, i) => (
             <ChordLine
@@ -566,16 +586,16 @@ export default function SongScreen() {
             />
           ))}
           <View style={{ height: 120 }} />
-        </View>
-      </ScrollView>
+        </Animated.View>
+      </Animated.ScrollView>
 
       <AutoScrollBar
         visible={autoScrollOpen}
         playing={autoScrollPlaying}
-        speed={scrollSpeed}
+        defaultSpeed={DEFAULT_SCROLL_SPEED}
         bottomOffset={insets.bottom + TOOLBAR_BOTTOM_MARGIN}
         onTogglePlay={onTogglePlay}
-        onSpeedChange={setScrollSpeed}
+        onSpeedChange={onSpeedChange}
         onClose={onCloseAutoScroll}
       />
 

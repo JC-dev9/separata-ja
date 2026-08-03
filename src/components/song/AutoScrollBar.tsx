@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -13,7 +13,7 @@ import { colors, radius, spacing } from '@/src/theme/colors';
 interface Props {
   visible: boolean;
   playing: boolean;
-  speed: number;
+  defaultSpeed: number;
   bottomOffset: number;
   onTogglePlay: () => void;
   onSpeedChange: (v: number) => void;
@@ -23,12 +23,16 @@ interface Props {
 export function AutoScrollBar({
   visible,
   playing,
-  speed,
+  defaultSpeed,
   bottomOffset,
   onTogglePlay,
   onSpeedChange,
   onClose,
 }: Props) {
+  // Velocidade vive aqui, não no ecrã da música: arrastar o slider não pode
+  // re-renderizar a música inteira a cada frame. O ecrã só recebe o valor
+  // através de onSpeedChange (escreve num ref, sem setState).
+  const [speed, setSpeed] = useState(defaultSpeed);
   const translateY = useSharedValue(120);
 
   useEffect(() => {
@@ -82,7 +86,10 @@ export function AutoScrollBar({
             minimumValue={0}
             maximumValue={1}
             value={speed}
-            onValueChange={onSpeedChange}
+            onValueChange={(v) => {
+              setSpeed(v);
+              onSpeedChange(v);
+            }}
             minimumTrackTintColor={colors.primary}
             maximumTrackTintColor={colors.border}
             thumbTintColor={colors.primary}
