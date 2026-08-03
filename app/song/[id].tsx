@@ -499,11 +499,11 @@ export default function SongScreen() {
           style={styles.staleBanner}
           onPress={onDiscardStale}
           accessibilityRole="button"
-          accessibilityLabel="Esta música foi actualizada. Toca para rever as tuas edições."
+          accessibilityLabel="Esta música foi atualizada. Toca para rever as tuas edições."
         >
           <Ionicons name="information-circle-outline" size={18} color={colors.background} />
           <Text style={styles.staleBannerText} numberOfLines={2}>
-            Esta música foi actualizada. As tuas edições baseiam-se numa versão anterior.
+            Esta música foi atualizada. As tuas edições baseiam-se numa versão anterior.
           </Text>
           <Text style={styles.staleBannerAction}>Rever</Text>
         </Pressable>
