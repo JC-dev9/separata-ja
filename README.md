@@ -1,7 +1,8 @@
 # Separata JA
 
 Hinário digital com cifras, transposição de tons, dicionário de acordes
-(violão e teclado), rolagem automática e afinador de instrumentos.
+(violão e teclado), rolagem automática, afinador de instrumentos e um ecrã de
+definições com gestão dos dados guardados no dispositivo.
 
 Construído com [Expo](https://expo.dev) (SDK 54), React Native 0.81 e
 expo-router.
@@ -45,8 +46,9 @@ Ver `.github/workflows/ci.yml`.
 
 ```
 app/                    Rotas (expo-router)
-  (tabs)/               Separadores: hinário, favoritos, afinador
+  (tabs)/               Separadores: hinário, favoritos, afinador, definições
   song/[id].tsx         Ecrã da música
+  privacy.tsx           Política de privacidade, legível offline
 src/
   components/           Componentes de UI
   data/                 Carregamento do hinário e formas de acordes
@@ -84,9 +86,18 @@ mudar de enquadramento, é preciso reavaliá-las.
 - **Lógica pura isolada.** `chord-parser`, `chord-transposer` e `pitch` não
   dependem do React nem do React Native, e é onde vive a cobertura de testes.
 - **Persistência sem context.** Os hooks (`useFavorites`, `useSongOverride`,
-  `useFontSize`, `useChordDictionaryCollapsed`) partilham estado através de um
-  cache em módulo com lista de listeners, hidratado do AsyncStorage no arranque.
-  Evita re-renders em cascata numa lista de 538 itens.
+  `useFontSize`, `useChordDictionaryCollapsed`, `useDefaultInstrument`) partilham
+  estado através de um cache em módulo com lista de listeners, hidratado do
+  AsyncStorage no arranque. Evita re-renders em cascata numa lista de 538 itens.
+  Para as preferências escalares esse padrão vive uma só vez em
+  `createPreference` (`src/hooks/createPreference.ts`); os favoritos e as edições
+  ficam à mão, porque têm colecções, migração de formatos e estado de gravação
+  falhada que não cabem numa forma genérica.
+- **Apagar é explícito; gravar é que é perigoso.** O `clear()` do
+  `createStorageSlot` atravessa o modo só-leitura, ao contrário do `write()`: o
+  slot suspende as escritas porque a memória não representa o disco, mas apagar dá
+  o mesmo resultado com ou sem esse conhecimento — e não é a app a errar, é o
+  utilizador a pedir, em Definições › Gestão de dados.
 - **Uma leitura falhada nunca apaga o disco.** `readStorage` distingue "a chave
   não existe" de "falhou a ler". Se a hidratação falhar, o estado em memória são
   valores por omissão e o disco pode ter os dados do utilizador, por isso o

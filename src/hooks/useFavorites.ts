@@ -47,6 +47,18 @@ export function hydrateFavorites(): Promise<void> {
 // favorite hearts on the first frame after boot.
 hydrateFavorites();
 
+/**
+ * Apaga todos os favoritos. `false` = não ficou apagado no disco.
+ *
+ * Ao contrário de uma gravação, isto funciona mesmo com a hidratação falhada:
+ * ver o comentário do `clear()` em `src/utils/storage.ts`.
+ */
+export function clearAllFavorites(): Promise<boolean> {
+  memoryCache = new Set();
+  notify();
+  return slot.clear();
+}
+
 export function useFavorites() {
   const [favorites, setFavorites] = useState<Set<number>>(memoryCache);
 

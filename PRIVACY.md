@@ -8,6 +8,10 @@ seus utilizadores.
 > ⚠️ **Rascunho.** Antes de publicar, substitui os campos marcados `[...]` e revê
 > o texto. Não é aconselhamento jurídico — se tiveres dúvidas, confirma com um
 > profissional.
+>
+> 📄 A aplicação mostra este texto em **Definições › Política de privacidade**, a
+> partir de `src/data/privacy.ts` (as secções "Contacto" e "Notas para publicação"
+> ficam de fora). **Ao alterar este ficheiro, alterar também esse.**
 
 ---
 
@@ -29,14 +33,15 @@ preferências:
 | Lista de hinos favoritos | Mostrar os teus favoritos |
 | Edições de acordes que faças | Preservar as tuas alterações |
 | Tamanho do texto | Manter a tua preferência de leitura |
+| Instrumento por omissão | Abrir os acordes no instrumento que tocas |
 | Estado do dicionário de acordes | Lembrar se o deixaste aberto ou fechado |
 
 Esta informação:
 
 - Nunca sai do dispositivo;
 - Não é enviada para nós nem para terceiros;
-- É apagada quando desinstalas a aplicação ou limpas os dados nas definições do
-  sistema.
+- É apagada quando desinstalas a aplicação, quando limpas os dados nas definições
+  do sistema, ou quando usas a secção **Gestão de dados** dentro da aplicação.
 
 ---
 

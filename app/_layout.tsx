@@ -72,6 +72,7 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="song/[id]" options={{ title: '' }} />
+              <Stack.Screen name="privacy" options={{ title: 'Privacidade' }} />
             </Stack>
             <StatusBar style="light" />
           </ThemeProvider>

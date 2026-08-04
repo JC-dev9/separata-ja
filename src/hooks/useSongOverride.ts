@@ -99,6 +99,24 @@ export function clearOverrideFor(songId: number): Promise<void> {
   return persist(memoryCache);
 }
 
+/**
+ * Apaga as edições de todas as músicas. `false` = não ficou apagado no disco.
+ *
+ * Funciona mesmo com a hidratação falhada — ver o comentário do `clear()` em
+ * `src/utils/storage.ts`. Se resultar, o aviso de gravação falhada deixa de
+ * fazer sentido: já não há edições para gravar.
+ */
+export function clearAllOverrides(): Promise<boolean> {
+  memoryCache = {};
+  notify();
+  return slot.clear().then((ok) => {
+    if (!ok || !saveFailed) return ok;
+    saveFailed = false;
+    notify();
+    return ok;
+  });
+}
+
 /** `true` quando a última gravação de edições não chegou ao disco. */
 export function hasSaveFailed(): boolean {
   return saveFailed;
@@ -126,6 +144,24 @@ export function hydrateOverrides(): Promise<void> {
 }
 
 hydrateOverrides();
+
+/** Quantas músicas têm edições guardadas. Para o ecrã de Definições. */
+export function useOverrideCount(): number {
+  const [count, setCount] = useState(() => Object.keys(memoryCache).length);
+
+  useEffect(() => {
+    if (!hydrated) {
+      hydrateOverrides().then(() => setCount(Object.keys(memoryCache).length));
+    }
+    const listener = (s: Snapshot) => setCount(Object.keys(s.overrides).length);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
+  return count;
+}
 
 export function useSongOverride(songId: number | undefined, originalContent?: string) {
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
