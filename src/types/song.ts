@@ -1,3 +1,9 @@
+/**
+ * Instrumento dos diagramas de acordes. Vive aqui, e não no componente que o
+ * desenha, para o hook da preferência não ter de importar de `src/components/`.
+ */
+export type Instrument = 'guitar' | 'piano';
+
 export interface Song {
   id: number;
   number: number;
