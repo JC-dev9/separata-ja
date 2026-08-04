@@ -1,64 +1,33 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
-import { createStorageSlot } from '@/src/utils/storage';
+import { createPreference, usePreference } from '@/src/hooks/createPreference';
 
-const STORAGE_KEY = '@separata:fontSize';
-const DEFAULT_FONT_SIZE = 19;
-const MIN_FONT = 12;
-const MAX_FONT = 28;
+export const DEFAULT_FONT_SIZE = 19;
+export const MIN_FONT = 12;
+export const MAX_FONT = 28;
 
-const slot = createStorageSlot(STORAGE_KEY);
-
-let cached: number = DEFAULT_FONT_SIZE;
-let hydrated = false;
-let hydrating: Promise<void> | null = null;
-const listeners = new Set<(size: number) => void>();
-
-function persist(size: number) {
-  slot.write(String(size));
-}
-
-function notify() {
-  listeners.forEach((fn) => fn(cached));
-}
-
-function hydrate(): Promise<void> {
-  if (hydrated) return Promise.resolve();
-  if (hydrating) return hydrating;
-  hydrating = slot.read().then((result) => {
-    // Se a leitura falhou ficamos no valor por omissão sem gravar nada, para não
-    // apagar o tamanho que o utilizador tinha escolhido.
-    if (result.ok) {
-      const parsed = result.value !== null ? parseInt(result.value, 10) : NaN;
-      cached = !isNaN(parsed) ? Math.min(MAX_FONT, Math.max(MIN_FONT, parsed)) : DEFAULT_FONT_SIZE;
-    }
-    hydrated = true;
-    notify();
-  });
-  return hydrating;
-}
-
-hydrate();
+export const fontSizePreference = createPreference<number>({
+  key: '@separata:fontSize',
+  defaultValue: DEFAULT_FONT_SIZE,
+  parse: (raw) => {
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? undefined : parsed;
+  },
+  serialize: String,
+  // O clamp vive aqui e não no `changeFont` para valer também para o que vem do
+  // disco — uma versão antiga da app, ou o dedo de alguém no AsyncStorage, não
+  // devem conseguir pôr o texto a um tamanho ilegível.
+  normalize: (size) => Math.min(MAX_FONT, Math.max(MIN_FONT, size)),
+});
 
 export function useFontSize() {
-  const [fontSize, setFontSize] = useState(cached);
+  const fontSize = usePreference(fontSizePreference);
 
-  useEffect(() => {
-    if (!hydrated) {
-      hydrate().then(() => setFontSize(cached));
-    }
-    const listener = (size: number) => setFontSize(size);
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
+  const changeFont = useCallback(
+    (delta: number) => void fontSizePreference.update((size) => size + delta),
+    [],
+  );
+  const setFontSize = useCallback((size: number) => void fontSizePreference.set(size), []);
 
-  const changeFont = useCallback((delta: number) => {
-    cached = Math.min(MAX_FONT, Math.max(MIN_FONT, cached + delta));
-    notify();
-    persist(cached);
-  }, []);
-
-  return { fontSize, changeFont };
+  return { fontSize, changeFont, setFontSize };
 }
