@@ -38,11 +38,24 @@ export function writeStorage(key: string, value: string): Promise<boolean> {
   );
 }
 
+/** Apaga uma chave. Nunca rejeita — devolve `false` se não conseguiu apagar. */
+export function removeStorage(key: string): Promise<boolean> {
+  return AsyncStorage.removeItem(key).then(
+    () => true,
+    (err) => {
+      warn(`falhou a apagar "${key}":`, err);
+      return false;
+    },
+  );
+}
+
 export interface StorageSlot {
   /** Lê a chave e, se falhar, suspende as escritas seguintes. */
   read(): Promise<ReadResult>;
   /** Grava, excepto em modo só-leitura. `false` = não ficou gravado. */
   write(value: string): Promise<boolean>;
+  /** Apaga a chave por ordem explícita do utilizador. `false` = não foi apagada. */
+  clear(): Promise<boolean>;
   /** `true` enquanto as escritas estiverem suspensas por hidratação falhada. */
   isBlocked(): boolean;
 }
@@ -81,6 +94,22 @@ export function createStorageSlot(key: string): StorageSlot {
         if (!result.ok || result.value !== null) return false;
         blocked = false;
         return writeStorage(key, value);
+      });
+    },
+
+    // Apagar é a única operação que atravessa o modo só-leitura. O slot suspende
+    // as escritas porque o estado em memória não representa o disco — mas apagar
+    // dá o mesmo resultado com ou sem esse conhecimento, e aqui não é a app a
+    // gravar valores por omissão por acidente: é o utilizador a pedir. Se
+    // resultar, memória e disco voltam a estar de acordo, e a suspensão deixa de
+    // fazer sentido.
+    clear() {
+      return removeStorage(key).then((ok) => {
+        if (ok) {
+          blocked = false;
+          retried = false;
+        }
+        return ok;
       });
     },
 

@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { createStorageSlot, readStorage, writeStorage } from '../storage';
+import { createStorageSlot, readStorage, removeStorage, writeStorage } from '../storage';
 
 const getItem = AsyncStorage.getItem as jest.Mock;
 const setItem = AsyncStorage.setItem as jest.Mock;
+const removeItem = AsyncStorage.removeItem as jest.Mock;
 
 const KEY = '@teste:chave';
 
@@ -11,6 +12,7 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   getItem.mockClear();
   setItem.mockClear();
+  removeItem.mockClear();
   // As falhas de I/O passam por console.warn em dev; não queremos ruído no CI.
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -55,6 +57,19 @@ describe('writeStorage', () => {
   it('devolve false quando falha, em vez de rejeitar', async () => {
     setItem.mockRejectedValueOnce(new Error('disco cheio'));
     expect(await writeStorage(KEY, 'v')).toBe(false);
+  });
+});
+
+describe('removeStorage', () => {
+  it('devolve true quando apaga', async () => {
+    await AsyncStorage.setItem(KEY, 'v');
+    expect(await removeStorage(KEY)).toBe(true);
+    expect(await AsyncStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('devolve false quando falha, em vez de rejeitar', async () => {
+    removeItem.mockRejectedValueOnce(new Error('disco'));
+    expect(await removeStorage(KEY)).toBe(false);
   });
 });
 
@@ -149,6 +164,50 @@ describe('createStorageSlot', () => {
     expect(await slot.write('v')).toBe(false);
     expect(slot.isBlocked()).toBe(true);
     expect(await AsyncStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('apaga o que está no disco mesmo com as escritas suspensas', async () => {
+    await AsyncStorage.setItem(KEY, 'dados-do-utilizador');
+
+    const slot = createStorageSlot(KEY);
+    getItem.mockRejectedValueOnce(new Error('disco'));
+    await slot.read();
+    expect(slot.isBlocked()).toBe(true);
+
+    // O contraponto deliberado ao teste de cima: uma *gravação* nestas condições
+    // apagaria dados por acidente e por isso é recusada; um clear() é uma ordem
+    // explícita do utilizador e dá o mesmo resultado com ou sem saber o que lá
+    // estava.
+    expect(await slot.clear()).toBe(true);
+    expect(await AsyncStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('levanta a suspensão depois de um clear bem sucedido', async () => {
+    await AsyncStorage.setItem(KEY, 'dados');
+
+    const slot = createStorageSlot(KEY);
+    getItem.mockRejectedValueOnce(new Error('disco'));
+    await slot.read();
+
+    await slot.clear();
+
+    // Memória e disco voltaram a estar de acordo: os dois estão vazios.
+    expect(slot.isBlocked()).toBe(false);
+    expect(await slot.write('novo')).toBe(true);
+    expect(await AsyncStorage.getItem(KEY)).toBe('novo');
+  });
+
+  it('mantém a suspensão se o clear falhar', async () => {
+    await AsyncStorage.setItem(KEY, 'dados');
+
+    const slot = createStorageSlot(KEY);
+    getItem.mockRejectedValueOnce(new Error('disco'));
+    await slot.read();
+
+    removeItem.mockRejectedValueOnce(new Error('disco'));
+    expect(await slot.clear()).toBe(false);
+    expect(slot.isBlocked()).toBe(true);
+    expect(await AsyncStorage.getItem(KEY)).toBe('dados');
   });
 
   it('isola chaves diferentes', async () => {
