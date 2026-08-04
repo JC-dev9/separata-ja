@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -7,18 +8,35 @@ import { PianoDiagram } from '@/src/components/song/diagrams/PianoDiagram';
 import { getGuitarShape, getPianoShape } from '@/src/data/chord-shapes';
 import { useChordDictionaryCollapsed } from '@/src/hooks/useChordDictionaryCollapsed';
 import { colors, radius, spacing } from '@/src/theme/colors';
+import { Instrument } from '@/src/types/song';
 
-export type Instrument = 'guitar' | 'piano';
+// O tipo mudou-se para src/types/song.ts; re-exportado aqui para os importadores
+// antigos (ChordDetailSheet, app/song/[id].tsx) não terem de mexer.
+export type { Instrument };
 
 interface Props {
   chords: string[];
   instrument: Instrument;
   onChangeInstrument: (i: Instrument) => void;
   onPressChord: (chord: string) => void;
+  /**
+   * Quantos diagramas montar. Cada um é um SVG com dezenas de nós; no primeiro
+   * frame do ecrã montamos só os que estão à vista (a lista é horizontal) e o
+   * resto entra logo a seguir, sem atrasar a abertura da música.
+   */
+  diagramLimit?: number;
 }
 
-export function ChordDictionary({ chords, instrument, onChangeInstrument, onPressChord }: Props) {
+function ChordDictionaryBase({
+  chords,
+  instrument,
+  onChangeInstrument,
+  onPressChord,
+  diagramLimit,
+}: Props) {
   const { collapsed, toggle } = useChordDictionaryCollapsed();
+  const shown =
+    diagramLimit != null && diagramLimit < chords.length ? chords.slice(0, diagramLimit) : chords;
 
   return (
     <Animated.View style={styles.wrap} layout={LinearTransition.duration(200)}>
@@ -70,20 +88,13 @@ export function ChordDictionary({ chords, instrument, onChangeInstrument, onPres
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.scroll}
           >
-            {chords.map((chord) => (
-              <Pressable
+            {shown.map((chord) => (
+              <DiagramCard
                 key={chord}
-                onPress={() => onPressChord(chord)}
-                accessibilityRole="button"
-                accessibilityLabel={`Ver o acorde ${chord}`}
-                style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
-              >
-                {instrument === 'guitar' ? (
-                  <GuitarDiagram chord={chord} shape={getGuitarShape(chord)} size="sm" />
-                ) : (
-                  <PianoDiagram chord={chord} shape={getPianoShape(chord)} size="sm" />
-                )}
-              </Pressable>
+                chord={chord}
+                instrument={instrument}
+                onPress={onPressChord}
+              />
             ))}
           </ScrollView>
         </Animated.View>
@@ -91,6 +102,36 @@ export function ChordDictionary({ chords, instrument, onChangeInstrument, onPres
     </Animated.View>
   );
 }
+
+// O ecrã da música re-renderiza várias vezes enquanto monta a letra por blocos.
+// Sem isto, cada uma dessas renderizações reconstruía todos os SVG do
+// dicionário — a parte mais cara da árvore.
+export const ChordDictionary = memo(ChordDictionaryBase);
+
+interface DiagramCardProps {
+  chord: string;
+  instrument: Instrument;
+  onPress: (chord: string) => void;
+}
+
+// A forma é calculada aqui dentro (e não passada por prop) porque getPianoShape
+// devolve um objecto novo a cada chamada, o que anularia o memo.
+const DiagramCard = memo(function DiagramCard({ chord, instrument, onPress }: DiagramCardProps) {
+  return (
+    <Pressable
+      onPress={() => onPress(chord)}
+      accessibilityRole="button"
+      accessibilityLabel={`Ver o acorde ${chord}`}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+    >
+      {instrument === 'guitar' ? (
+        <GuitarDiagram chord={chord} shape={getGuitarShape(chord)} size="sm" />
+      ) : (
+        <PianoDiagram chord={chord} shape={getPianoShape(chord)} size="sm" />
+      )}
+    </Pressable>
+  );
+});
 
 interface ToggleBtnProps {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;

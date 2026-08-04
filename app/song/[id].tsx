@@ -2,9 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  InteractionManager,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Animated, {
-  LinearTransition,
   scrollTo,
   useAnimatedRef,
   useAnimatedScrollHandler,
@@ -30,6 +37,7 @@ import { KeySheet, KeySheetHandle } from '@/src/components/song/KeySheet';
 import { SongToolbar, TOOLBAR_BOTTOM_MARGIN, TOOLBAR_PILL_HEIGHT, toolbarBottomOffset } from '@/src/components/song/SongToolbar';
 import { UndoSnackbar } from '@/src/components/song/UndoSnackbar';
 import { getSongById } from '@/src/data/songs';
+import { useDefaultInstrument } from '@/src/hooks/useDefaultInstrument';
 import { useFavorites } from '@/src/hooks/useFavorites';
 import { useFontSize } from '@/src/hooks/useFontSize';
 import { colors, spacing } from '@/src/theme/colors';
@@ -44,14 +52,36 @@ import {
   transposeChord,
 } from '@/src/utils/chord-transposer';
 
-// Auto-scroll: speed range tuned so 0 ≈ 0.05 px/frame, 1 ≈ 0.8 px/frame.
-const MIN_PX_PER_FRAME = 0.05;
-const MAX_PX_PER_FRAME = 0.8;
+// Auto-scroll: velocidade em px/segundo, não px/frame. Em px/frame a rolagem
+// anda ao sabor da taxa de refrescamento (num ecrã de 120 Hz ia ao dobro) e
+// qualquer frame perdido virava um solavanco; multiplicar pelo tempo real
+// decorrido mantém o movimento constante e contínuo.
+const MIN_PX_PER_SEC = 3;
+const MAX_PX_PER_SEC = 48;
+// Um frame muito atrasado (app em segundo plano, GC) não pode virar um salto
+// gigante: limitamos o delta de tempo que aceitamos num único frame.
+const MAX_FRAME_MS = 64;
 // Silêncio de eventos de scroll a partir do qual damos a inércia por terminada
 // e retomamos a rolagem automática (rede de segurança para as plataformas que
 // não disparam onMomentumScrollEnd quando não houve inércia nenhuma).
 const RESUME_AFTER_TOUCH_MS = 150;
 const DEFAULT_SCROLL_SPEED = 0.3;
+
+// A letra é montada por fases. No primeiro frame só entra o que cabe no ecrã
+// (a música abre instantaneamente); o resto é montado em blocos depois da
+// transição de navegação terminar. A partir daí está tudo montado, por isso
+// rolar — à mão ou automaticamente — não custa trabalho nenhum à thread de JS.
+const INITIAL_ROWS = 14;
+const ROW_CHUNK = 24;
+// Só os primeiros diagramas do dicionário entram no primeiro frame: são SVGs
+// caros e os restantes estão fora do ecrã (a lista é horizontal).
+const INITIAL_DIAGRAMS = 4;
+
+// Os créditos entram como a primeira linha para não interromperem o dicionário
+// de acordes, que é o único header fixo.
+type Row =
+  | { key: string; kind: 'credits'; text: string }
+  | { key: string; kind: 'line'; line: string; lineIdx: number };
 
 export default function SongScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -60,7 +90,14 @@ export default function SongScreen() {
   const insets = useSafeAreaInsets();
 
   const { fontSize, changeFont } = useFontSize();
-  const [instrument, setInstrument] = useState<Instrument>('guitar');
+  // A preferência é o ponto de partida, não uma imposição: trocar de instrumento
+  // aqui é explorar (ver como fica no teclado), não redefinir o que está nas
+  // Definições. Por isso a escolha vale só nesta música e não é gravada. Enquanto
+  // `sessionInstrument` for null, a hidratação tardia da preferência chega cá
+  // sozinha, sem effect de sincronização.
+  const { instrument: defaultInstrument } = useDefaultInstrument();
+  const [sessionInstrument, setSessionInstrument] = useState<Instrument | null>(null);
+  const instrument = sessionInstrument ?? defaultInstrument;
   const [editing, setEditing] = useState(false);
 
   const { override, setOverride, clearOverride, hasOverride, isStale, saveFailed } =
@@ -77,6 +114,42 @@ export default function SongScreen() {
 
   // Pre-split content + base chord set.
   const lines = useMemo(() => effectiveContent.split('\n'), [effectiveContent]);
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
+    if (song?.credits) out.push({ key: 'credits', kind: 'credits', text: song.credits });
+    lines.forEach((line, i) => out.push({ key: String(i), kind: 'line', line, lineIdx: i }));
+    return out;
+  }, [song?.credits, lines]);
+  // Fase 1: só o que cabe no ecrã, para o push de navegação não esperar por
+  // nada. Fase 2 (depois da transição): o resto entra em blocos, um por frame.
+  const [mountedRows, setMountedRows] = useState(INITIAL_ROWS);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // Esperamos pela transição de navegação para não lhe roubar frames, mas o
+    // temporizador garante que o resto da música entra mesmo que algo fique a
+    // segurar o InteractionManager (um gesto, por exemplo).
+    const task = InteractionManager.runAfterInteractions(() => setReady(true));
+    const timer = setTimeout(() => setReady(true), 400);
+    return () => {
+      task.cancel();
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || mountedRows >= rows.length) return;
+    const handle = requestAnimationFrame(() =>
+      setMountedRows((n) => Math.min(rows.length, n + ROW_CHUNK)),
+    );
+    return () => cancelAnimationFrame(handle);
+  }, [ready, mountedRows, rows.length]);
+
+  const visibleRows = useMemo(
+    () => (mountedRows >= rows.length ? rows : rows.slice(0, mountedRows)),
+    [rows, mountedRows],
+  );
+
   const baseChords = useMemo(
     () => (effectiveContent ? extractUniqueChords(effectiveContent) : []),
     [effectiveContent],
@@ -116,11 +189,31 @@ export default function SongScreen() {
   const lastScrollYSV = useSharedValue(0);
   const speedSV = useSharedValue(DEFAULT_SCROLL_SPEED);
   const autoScrollOpenSV = useSharedValue(false);
+  const autoScrollPlayingSV = useSharedValue(false);
   // Dedo em baixo: o utilizador manda na rolagem.
   const draggingSV = useSharedValue(false);
   // Instante do último evento de scroll ainda causado pelo gesto (inércia);
   // 0 quando não há gesto a decorrer.
   const userScrollAtSV = useSharedValue(0);
+  // Limites do conteúdo, para a rolagem automática parar no fim em vez de
+  // continuar a somar offset contra um scroll que o nativo já travou (era isso
+  // que fazia o scroll dar um salto para trás ao voltar a tocar no ecrã).
+  const contentHeightSV = useSharedValue(0);
+  const viewportHeightSV = useSharedValue(0);
+
+  const onContentSizeChange = useCallback(
+    (_w: number, h: number) => {
+      contentHeightSV.value = h;
+    },
+    [contentHeightSV],
+  );
+
+  const onScrollViewLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      viewportHeightSV.value = e.nativeEvent.layout.height;
+    },
+    [viewportHeightSV],
+  );
 
   // Pill hide/show animation
   const pillTranslateY = useSharedValue(0);
@@ -142,7 +235,7 @@ export default function SongScreen() {
 
   // Corre inteiramente na UI thread: nenhum toque em botão fica em fila atrás
   // disto enquanto a rolagem automática está ativa.
-  const scrollTick = useFrameCallback(() => {
+  const scrollTick = useFrameCallback((frame) => {
     'worklet';
     // Enquanto o dedo está em baixo, ou a inércia do gesto ainda corre, não
     // mexemos no scroll: o utilizador rola à vontade e a automática retoma
@@ -152,14 +245,19 @@ export default function SongScreen() {
       if (Date.now() - userScrollAtSV.value < RESUME_AFTER_TOUCH_MS) return;
       userScrollAtSV.value = 0;
     }
-    const px = MIN_PX_PER_FRAME + (MAX_PX_PER_FRAME - MIN_PX_PER_FRAME) * speedSV.value;
-    offsetSV.value += px;
-    scrollTo(scrollRef, 0, offsetSV.value, false);
+    const dt = Math.min(frame.timeSincePreviousFrame ?? 16.667, MAX_FRAME_MS);
+    const pxPerSec = MIN_PX_PER_SEC + (MAX_PX_PER_SEC - MIN_PX_PER_SEC) * speedSV.value;
+    const maxOffset = Math.max(0, contentHeightSV.value - viewportHeightSV.value);
+    const next = Math.min(offsetSV.value + (pxPerSec * dt) / 1000, maxOffset);
+    if (next === offsetSV.value) return;
+    offsetSV.value = next;
+    scrollTo(scrollRef, 0, next, false);
   }, false);
 
   useEffect(() => {
     scrollTick.setActive(autoScrollPlaying);
-  }, [autoScrollPlaying, scrollTick]);
+    autoScrollPlayingSV.value = autoScrollPlaying;
+  }, [autoScrollPlaying, scrollTick, autoScrollPlayingSV]);
 
   // Sheets
   const keySheetRef = useRef<KeySheetHandle>(null);
@@ -194,7 +292,15 @@ export default function SongScreen() {
       const y = e.contentOffset.y;
       const dy = y - lastScrollYSV.value;
       lastScrollYSV.value = y;
-      offsetSV.value = y;
+
+      // Enquanto o tick é o único a mover o scroll, ele já mantém offsetSV
+      // certo; re-sincronizar aqui a partir do y reportado (que chega com um
+      // pequeno atraso nativo) cria um cabo-de-guerra entre os dois que trava
+      // a velocidade — mais visível quanto mais rápido o tick avança por
+      // frame. Só repomos offsetSV quando o movimento não é só do tick: dedo
+      // em baixo, inércia do gesto a decorrer, ou rolagem automática desligada.
+      const tickDriven = autoScrollPlayingSV.value && !draggingSV.value && !userScrollAtSV.value;
+      if (!tickDriven) offsetSV.value = y;
 
       // Mantém a automática em pausa enquanto os eventos ainda vêm do gesto.
       if (draggingSV.value || userScrollAtSV.value) userScrollAtSV.value = Date.now();
@@ -388,6 +494,12 @@ export default function SongScreen() {
     [originalKey, transposeSemitones, setOverride],
   );
 
+  const isMovingActive = editMode === 'move' && movingChord != null;
+  const deleteHandler = editMode === 'delete' ? onDeleteChord : undefined;
+  const insertHandler = editMode === 'insert' ? onInsertChord : undefined;
+  const moveSourceHandler = editMode === 'move' ? onSelectMoveSource : undefined;
+  const moveToHandler = editMode === 'move' ? onMoveTo : undefined;
+
   const onUndoDelete = useCallback(() => {
     if (undoSnapshot == null) return;
     if (song && undoSnapshot === song.content) clearOverride();
@@ -549,44 +661,64 @@ export default function SongScreen() {
         </View>
       ) : null}
 
+      {/* Sem virtualização de propósito: a música mais longa do hinário tem
+          128 linhas, e mantê-las todas montadas é o que torna a rolagem —
+          sobretudo a automática a alta velocidade — perfeitamente contínua.
+          Uma lista virtualizada teria de montar células novas a meio da
+          rolagem, na thread de JS, e era isso que provocava o travamento. O
+          custo de as montar é pago uma vez, em blocos, depois de abrir. */}
       <Animated.ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
+        onContentSizeChange={onContentSizeChange}
+        onLayout={onScrollViewLayout}
         scrollEventThrottle={16}
         stickyHeaderIndices={[0]}
-        removeClippedSubviews
       >
         <ChordDictionary
           chords={uniqueChords}
+          diagramLimit={ready ? undefined : INITIAL_DIAGRAMS}
           instrument={instrument}
-          onChangeInstrument={setInstrument}
+          onChangeInstrument={setSessionInstrument}
           onPressChord={onChordPress}
         />
 
-        <Animated.View layout={LinearTransition.duration(200)} style={styles.lyricsWrap}>
-          {song.credits ? <Text style={styles.credits}>{song.credits}</Text> : null}
-          {lines.map((line, i) => (
-            <ChordLine
-              key={i}
-              line={line}
-              lineIdx={i}
-              fontSize={fontSize}
-              transpose={transposeSemitones}
-              targetKey={currentKey}
-              onChordPress={onChordPress}
-              editing={editing}
-              onDeleteChord={editMode === 'delete' ? onDeleteChord : undefined}
-              onInsertChord={editMode === 'insert' ? onInsertChord : undefined}
-              selectingMoveSource={selectingMove}
-              onSelectMoveSource={editMode === 'move' ? onSelectMoveSource : undefined}
-              isMoving={editMode === 'move' && movingChord != null}
-              movingFromSegIdx={editMode === 'move' && movingChord?.lineIdx === i ? movingChord.segIdx : undefined}
-              onMoveTo={editMode === 'move' ? onMoveTo : undefined}
-            />
-          ))}
-          <View style={{ height: 120 }} />
-        </Animated.View>
+        {visibleRows.map((row, index) => {
+          const rowStyle = index === 0 ? rowPadFirstStyle : styles.rowPad;
+          if (row.kind === 'credits') {
+            return (
+              <Text key={row.key} style={[styles.credits, rowStyle]}>
+                {row.text}
+              </Text>
+            );
+          }
+          const i = row.lineIdx;
+          return (
+            <View key={row.key} style={rowStyle}>
+              <ChordLine
+                line={row.line}
+                lineIdx={i}
+                fontSize={fontSize}
+                transpose={transposeSemitones}
+                targetKey={currentKey}
+                onChordPress={onChordPress}
+                editing={editing}
+                onDeleteChord={deleteHandler}
+                onInsertChord={insertHandler}
+                selectingMoveSource={selectingMove}
+                onSelectMoveSource={moveSourceHandler}
+                isMoving={isMovingActive}
+                movingFromSegIdx={
+                  editMode === 'move' && movingChord?.lineIdx === i ? movingChord.segIdx : undefined
+                }
+                onMoveTo={moveToHandler}
+              />
+            </View>
+          );
+        })}
+
+        <View style={styles.footerSpacer} />
       </Animated.ScrollView>
 
       <AutoScrollBar
@@ -658,8 +790,14 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 0,
   },
-  lyricsWrap: {
-    padding: spacing.lg,
+  rowPad: {
+    paddingHorizontal: spacing.lg,
+  },
+  rowPadFirst: {
+    paddingTop: spacing.lg,
+  },
+  footerSpacer: {
+    height: spacing.lg + 120,
   },
   credits: {
     color: colors.textMuted,
@@ -730,3 +868,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+// Fora do render: um array de estilos criado a cada render forçava a primeira
+// linha a re-renderizar sem necessidade.
+const rowPadFirstStyle = [styles.rowPad, styles.rowPadFirst];
