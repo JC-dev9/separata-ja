@@ -75,7 +75,7 @@ async function compose({ size, logoHeightRatio, hex, background, out, opaque }) 
 
   await compose({
     size: 1024,
-    logoHeightRatio: 0.62,
+    logoHeightRatio: 0.72,
     hex: LIGHT,
     background: BG,
     opaque: true,
@@ -83,10 +83,10 @@ async function compose({ size, logoHeightRatio, hex, background, out, opaque }) 
   });
 
   // Adaptive icon Android: o sistema corta as bordas, por isso a logo fica
-  // dentro da zona segura (~66% central).
+  // dentro da zona segura (~66% central), mas com menos margem visual.
   await compose({
     size: 1024,
-    logoHeightRatio: 0.48,
+    logoHeightRatio: 0.56,
     hex: LIGHT,
     out: 'android-icon-foreground.png',
   });
@@ -99,7 +99,7 @@ async function compose({ size, logoHeightRatio, hex, background, out, opaque }) 
   // Ícone temático do Android 13+: silhueta branca sobre transparente.
   await compose({
     size: 1024,
-    logoHeightRatio: 0.48,
+    logoHeightRatio: 0.56,
     hex: '#FFFFFF',
     out: 'android-icon-monochrome.png',
   });
