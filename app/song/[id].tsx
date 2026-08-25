@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useKeepAwake } from 'expo-keep-awake';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -84,6 +85,8 @@ type Row =
   | { key: string; kind: 'line'; line: string; lineIdx: number };
 
 export default function SongScreen() {
+  useKeepAwake();
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const songId = parseInt(id ?? '0', 10);
   const song = useMemo(() => getSongById(songId), [songId]);
