@@ -26,8 +26,8 @@ const LOGO_MARK_FILL = 430 / 1732; // altura da marca ÷ largura da logo complet
 const LOGO_MARK_CENTER = 186 / 1732; // a marca ocupa as colunas 0–372 de 1732
 
 const HOLD_MS = 150; // continua o splash nativo antes de mexer
-const MORPH_MS = 430; // a marca encolhe para o sítio dela na logo completa
-const SETTLE_MS = 420; // logo completa parada, a dar tempo a ler o nome
+const MORPH_MS = 900; // a marca encolhe com calma para o sítio dela na logo completa
+const SETTLE_MS = 900; // logo completa parada, a dar tempo a ler o nome
 const OUT_MS = 340;
 
 const OUT_DELAY = HOLD_MS + MORPH_MS + SETTLE_MS;
