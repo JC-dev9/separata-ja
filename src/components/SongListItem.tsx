@@ -9,13 +9,12 @@ export const ROW_HEIGHT = 76;
 
 interface Props {
   song: Song;
-  numberLabel?: string;
   isFavorite: boolean;
   onPress: (id: number) => void;
   onToggleFavorite: (id: number) => void;
 }
 
-function SongListItemBase({ song, numberLabel, isFavorite, onPress, onToggleFavorite }: Props) {
+function SongListItemBase({ song, isFavorite, onPress, onToggleFavorite }: Props) {
   const handlePress = useCallback(() => onPress(song.id), [onPress, song.id]);
   const handleHeart = useCallback(() => onToggleFavorite(song.id), [onToggleFavorite, song.id]);
 
@@ -24,12 +23,9 @@ function SongListItemBase({ song, numberLabel, isFavorite, onPress, onToggleFavo
       onPress={handlePress}
       android_ripple={{ color: colors.surfaceElevated }}
       accessibilityRole="button"
-      accessibilityLabel={`Hino ${song.number}, ${song.title}`}
+      accessibilityLabel={`Música ${song.title}`}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={styles.numberBox}>
-        <Text style={styles.number}>{numberLabel ?? String(song.number).padStart(2, '0')}</Text>
-      </View>
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>
           {song.title}
@@ -73,20 +69,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
-  },
-  numberBox: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  number: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: '700',
   },
   body: {
     flex: 1,

@@ -30,7 +30,6 @@ export default function FavoritesScreen() {
     ({ item }) => (
       <SongListItem
         song={item}
-        numberLabel={item.numberLabel}
         isFavorite={isFavorite(item.id)}
         onPress={openSong}
         onToggleFavorite={toggle}

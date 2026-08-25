@@ -3,7 +3,6 @@ import { parseSong, RawSong, Song } from '../types/song';
 
 export interface IndexedSong extends Song {
   searchIndex: string;
-  numberLabel: string;
 }
 
 let cache: IndexedSong[] | null = null;
@@ -18,13 +17,12 @@ function build(): IndexedSong[] {
     const base = parseSong(raw);
     return {
       ...base,
-      numberLabel: String(base.number).padStart(2, '0'),
       searchIndex: stripAccents(
-        `${base.title} ${base.credits ?? ''} ${base.number}`,
+        `${base.title} ${base.credits ?? ''}`,
       ).toLowerCase(),
     };
   });
-  list.sort((a, b) => a.number - b.number);
+  list.sort((a, b) => a.title.localeCompare(b.title, 'pt', { sensitivity: 'base' }));
   return list;
 }
 

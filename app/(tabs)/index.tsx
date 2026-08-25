@@ -32,7 +32,6 @@ export default function HomeScreen() {
     ({ item }) => (
       <SongListItem
         song={item}
-        numberLabel={item.numberLabel}
         isFavorite={isFavorite(item.id)}
         onPress={openSong}
         onToggleFavorite={toggle}
@@ -56,9 +55,9 @@ export default function HomeScreen() {
         <Ionicons name="search" size={18} color={colors.textMuted} />
         <TextInput
           style={styles.search}
-          placeholder="Buscar por título, autor ou número…"
+          placeholder="Buscar por título ou autor…"
           placeholderTextColor={colors.textMuted}
-          accessibilityLabel="Buscar hinos por título, autor ou número"
+          accessibilityLabel="Buscar músicas por título ou autor"
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
@@ -102,7 +101,7 @@ export default function HomeScreen() {
             <Ionicons name="search-outline" size={28} color={colors.textDim} />
             <Text style={styles.emptyTitle}>Nenhum hino encontrado</Text>
             <Text style={styles.emptyHint}>
-              Tenta outro título, autor ou número.
+              Tenta outro título ou autor.
             </Text>
           </View>
         }

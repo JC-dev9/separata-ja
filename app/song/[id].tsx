@@ -578,7 +578,7 @@ export default function SongScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: `${String(song.number).padStart(2, '0')}. ${song.title}`,
+          title: song.title,
           headerRight: () => (
             <View style={styles.headerRight}>
               {hasOverride ? (
