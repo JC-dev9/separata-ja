@@ -58,7 +58,8 @@
           "microphonePermission": "Permite o acesso ao microfone para usar o afinador de violão."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
